@@ -1,2 +1,4 @@
-T52_FSAE_Telemetry
-==================
+T52 FSAE Telemetry
+===============
+Realtime remote datalogging tool.
+
