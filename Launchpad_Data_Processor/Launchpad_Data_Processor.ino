@@ -125,29 +125,50 @@ void setup() {
           Serial.println("Printed: atwr");
           break;
         }
+        case 3:
+        {
+          Serial2.println("atcn");
+          Serial.println("Printed: atcn");
+          break;
+        }
         default:
         {
           Serial.println("Xbee Config Error");
           break;
         }
       }
-      delay(1000);
       
+      delay(1000);
+      int timeCheck = millis()/1000;
+      while(Serial2.available() < 2)
+      {
+        Serial.println("")
+        if((millis()/1000 - timeCheck) > 5) break;
+      }
       if(Serial2.available() > 1)
       {
         char start_buf[10] = "";
         Serial2.readBytes(start_buf, Serial2.available());
-        Serial.println(String(start_buf));
         
-        if(String(start_buf) == "OK\r")
-          Serial.println("OK found Here");
-        else continue;
+        if(String(start_buf).equals("OK\r"))
+        {
+          Serial.print(String(start_buf));
+          Serial.println(" Found");
+        }
+        else 
+        {
+          Serial.print("No OK received. Serial read was: ");
+          Serial.println(String(start_buf));
+          continue;
+        }
       }
+      else continue;
+     
       ok_count++;
       Serial.flush();
-      Serial.print(ok_count);
-      Serial.println(" OK found");  
-    }  while(ok_count < 3); 
+      //Serial.print(ok_count);
+      //Serial.println(" OK found");  
+    }  while(ok_count < 4); 
     
     Serial.println("OK received. Configuration complete");
     
@@ -384,5 +405,4 @@ void sendConfigString()
     }
     return;
 }
-
 
