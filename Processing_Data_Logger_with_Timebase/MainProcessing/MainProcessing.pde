@@ -32,10 +32,10 @@ import java.util.*;
 import java.util.zip.*; 
 
 //===================================Program Settings====================================
-String serialPortName = "COM9";          //  Select Serial port to connect to.
+String serialPortName = "COM6";          //  Select Serial port to connect to.
 int Baudrate = 115200;                     //  set data rate
 
-int sigNum = 10;                         //  Allows for varied number of signals, for testing
+int sigNum = 6;                         //  Allows for varied number of signals, for testing
                                          //  purposes
                                          
 boolean mockupSerial = false;            //  If you want to debug the plotter without 
@@ -81,6 +81,14 @@ String dataFolder;                                  //  Setup datalog output
 PrintWriter output;                                 //  Output variable for logging data
 
 
+
+
+
+
+
+
+
+
 //==================================Program Setup=======================================
 void setup() {
   frame.setTitle("RMIT T52FSAE Realtime Serial Data Plotter");    //  Add a window title
@@ -110,7 +118,7 @@ void setup() {
   
   //~~~~~~~~~~~~~~~~~~~~~~~~~~~~graph settings save file~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   topSketchPath = sketchPath;
-  plotterConfigJSON = loadJSONObject(topSketchPath+"/datalog_config.json");
+  plotterConfigJSON = loadJSONObject(topSketchPath+"/plotter_config.json");
   
   //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~create GUI  object~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   cp5 = new ControlP5(this);
@@ -141,7 +149,7 @@ void setup() {
     //~~~~~~~~~~~~~~~save some default plotter configuration settings~~~~~~~~~~~~~~~~~~~
     plotterConfigJSON.setString("lgMinX", "-100");             //  Set X-axis minimum
     plotterConfigJSON.setString("lgMaxX", "0");                //  Set X-axis maximum
-    saveJSONObject(plotterConfigJSON, topSketchPath+"/datalog_config.json");
+    saveJSONObject(plotterConfigJSON, topSketchPath+"/plotter_config.json");
     
     //~~~~~~~~~~~~~~~~~~~~build x axis values for the line graph~~~~~~~~~~~~~~~~~~~~~~~~
     for (int i=0; i<lineGraphValues.length; i++) {            //  Loops through data 
@@ -160,7 +168,7 @@ void setup() {
     plotterConfigJSON.setString("lgMaxX", "0");              //  Set X-axis maximum
     plotterConfigJSON.setString("Plot Pause", "0");          //  Unpause by default
      plotterConfigJSON.setString("Transmit Stat", "0");      //  Not transmitting by default
-    saveJSONObject(plotterConfigJSON, topSketchPath+"/datalog_config.json");
+    saveJSONObject(plotterConfigJSON, topSketchPath+"/plotter_config.json");
     
     //~~~~~~~Setup array of lists used to plot a continually expanding data set~~~~~~~~~
     for(i=0; i<sigNum; i++)
@@ -298,6 +306,7 @@ void setup() {
 
 //===================================Main Program Loop==================================
 String myString = "";
+String[] nums;
 boolean serialEventTriggered = false;
 boolean readError = false;
 int endIndex = 0;
@@ -316,8 +325,7 @@ void draw() {
   //~~~~~~~~~~~~~~~~~~~Read in serial stream and if data is available~~~~~~~~~~~~~~~~~~~
   int x = 100;                                 //  X and Y coordinate variables
   int y = 125;
-  
-  if ((mockupSerial || serialEventTriggered)  && startFlag) {
+  if ((mockupSerial || serialEventTriggered)  && startFlag && !resetFlag) {
     String todlog = "";
     float maxTimeBase = 0;   
     background(255);                             //  Set Main background colour
@@ -354,13 +362,8 @@ void draw() {
     output.println(todlog.replace(" ",",").replace("\r",""));
 
     //~~~~~~~~~~~~~~~~~~~~~~~~split string at delimiter (space)~~~~~~~~~~~~~~~~~~~~~~~~~
-    String[] nums = split(myString, ' ');
+    nums = split(myString, ' ');
 
-    if(resetFlag)                               //  Checks whether a reset signal has 
-    {                                           //  been sent. If so, there is a chance
-      resetFlag = false;                        //  that nums holds a previous time sample,
-      return;                                   //  and should therefore, be discarded.
-    }
     //~~~~~~~~~~~~~~~~count number of line graphs to hide [linked to GUI]~~~~~~~~~~~~~~~
     int numberOfInvisibleLineGraphs = 0;
     for (i=0; i<sigNum; i++) {
@@ -430,7 +433,7 @@ void draw() {
         fill(255, 0, 0);                       
         stroke(255);
         rect(x, y, 20, 10);                    //  If not, an error indicator turns red.
-        
+
         Textlabel resetMessage = ((Textlabel)cp5.getController("Reset Message"));
         resetMessage.setVisible(true);
         return;
@@ -511,7 +514,7 @@ void draw() {
         plotterConfigJSON.setString("lgMaxX", timeBase[timeIndexMax]+ "");
       }
       
-      saveJSONObject(plotterConfigJSON, topSketchPath+"/datalog_config.json");
+      saveJSONObject(plotterConfigJSON, topSketchPath+"/plotter_config.json");
       setChartSettings();   //  The x axis is thus updated by referencing the saved value.
       
                             //  Given the range, checks whether graph has sufficient
@@ -626,18 +629,19 @@ void setLegendSettings()
   return;
 }
 
-
-
-
-
 //==========================Handler for reading serial data=========================
 byte[] inBuffer = new byte[500];                  //  Buffer to hold serial message
 void serialEvent(Serial p)
 {
-  for(i=0; i<499; i++) inBuffer[i] = 0;            // Flushes the buffer of old data.
+  for(i=0; i<499; i++) inBuffer[i] = 0;           // Flushes the buffer of old data.
   
-  serialPort.readBytesUntil('\r', inBuffer);    //  Read serial data into buffer
-
+  serialPort.readBytesUntil('\r', inBuffer);      //  Read serial data into buffer
+  
+  if(char(inBuffer[0]) == '0')  resetFlag = false;//  This is for the case of a time
+                                                  //  reset, and if one occurs, will
+                                                  //  not reset the flag until the first
+                                                  //  '0' character is recognised.
+                                                  
   for(i=0; i<499; i++)        //  Checks for invalid characters in buffer. If any are
   {                          //  found, handler returns, and data discarded.
     if(((inBuffer[i] < 48) || (inBuffer[i] > 57)) && inBuffer[i] != 32 && inBuffer[i] != 13 && inBuffer[i] != 0 && inBuffer[i] != 46 && inBuffer[i] != 45)
@@ -776,18 +780,23 @@ void controlEvent(ControlEvent theEvent) {
     else if (theEvent.isAssignableFrom(Button.class) && parameter == "Reset Timer")
     {
       serialPort.write("---");
+      for(i=0; i<nums.length; i++)
+        nums[i] = "";
       for(i=0; i<lineGraphDataList.length; i++)
       {
         lineGraphDataList[i].clear();                    //  Clears each data set
         lineGraphDataList[i].append(0);                  //  Appends a 0 for the first element.
-        n = 0;                                           //  Resets 'draw' execution count
-        timeIndexMin = 0;                                //  Resets index min and max to 0
-        timeIndexMax = 0;   
+        
       } 
-      resetFlag = true;
+      n = 0;                                           //  Resets 'draw' execution count
+      timeIndexMin = 0;                                //  Resets index min and max to 0
+      timeIndexMax = 0;  
+      resetFlag = true;      //  Sets the reset flag to true, which will disable any attempts
+                             //  to plot data until the reset is recognised in the values
+                             //  being read from the serial port.
     }
 
-    saveJSONObject(plotterConfigJSON, topSketchPath+"/datalog_config.json");
+    saveJSONObject(plotterConfigJSON, topSketchPath+"/plotter_config.json");
   }
 
   setChartSettings();
