@@ -118,7 +118,7 @@ void setup() {
   
   //~~~~~~~~~~~~~~~~~~~~~~~~~~~~graph settings save file~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   topSketchPath = sketchPath;
-  plotterConfigJSON = loadJSONObject(topSketchPath+"/plotter_config.json");
+  plotterConfigJSON = loadJSONObject(topSketchPath+"/datalog_config.json");
   
   //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~create GUI  object~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   cp5 = new ControlP5(this);
@@ -149,7 +149,7 @@ void setup() {
     //~~~~~~~~~~~~~~~save some default plotter configuration settings~~~~~~~~~~~~~~~~~~~
     plotterConfigJSON.setString("lgMinX", "-100");             //  Set X-axis minimum
     plotterConfigJSON.setString("lgMaxX", "0");                //  Set X-axis maximum
-    saveJSONObject(plotterConfigJSON, topSketchPath+"/plotter_config.json");
+    saveJSONObject(plotterConfigJSON, topSketchPath+"/datalog_config.json");
     
     //~~~~~~~~~~~~~~~~~~~~build x axis values for the line graph~~~~~~~~~~~~~~~~~~~~~~~~
     for (int i=0; i<lineGraphValues.length; i++) {            //  Loops through data 
@@ -168,7 +168,7 @@ void setup() {
     plotterConfigJSON.setString("lgMaxX", "0");              //  Set X-axis maximum
     plotterConfigJSON.setString("Plot Pause", "0");          //  Unpause by default
      plotterConfigJSON.setString("Transmit Stat", "0");      //  Not transmitting by default
-    saveJSONObject(plotterConfigJSON, topSketchPath+"/plotter_config.json");
+    saveJSONObject(plotterConfigJSON, topSketchPath+"/datalog_config.json");
     
     //~~~~~~~Setup array of lists used to plot a continually expanding data set~~~~~~~~~
     for(i=0; i<sigNum; i++)
@@ -514,7 +514,7 @@ void draw() {
         plotterConfigJSON.setString("lgMaxX", timeBase[timeIndexMax]+ "");
       }
       
-      saveJSONObject(plotterConfigJSON, topSketchPath+"/plotter_config.json");
+      saveJSONObject(plotterConfigJSON, topSketchPath+"/datalog_config.json");
       setChartSettings();   //  The x axis is thus updated by referencing the saved value.
       
                             //  Given the range, checks whether graph has sufficient
@@ -796,7 +796,7 @@ void controlEvent(ControlEvent theEvent) {
                              //  being read from the serial port.
     }
 
-    saveJSONObject(plotterConfigJSON, topSketchPath+"/plotter_config.json");
+    saveJSONObject(plotterConfigJSON, topSketchPath+"/datalog_config.json");
   }
 
   setChartSettings();
