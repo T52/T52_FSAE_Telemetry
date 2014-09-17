@@ -1,8 +1,8 @@
 Processing Data Logger with Timebase
 ===============
-http://processing.org/
-http://www.sojamo.de/libraries/controlP5/
-
-Remember to set 
-Baudrate, default 115200
-Serial Port name, eg "COM3", "COM4", "/dev/ttyS0"
+- Resources
+  1. [Processing IDE](http://processing.org/)
+  2. [controlP5 gui library] (http://www.sojamo.de/libraries/controlP5/)
+- To note, remember to set
+    1. Baudrate, default 115200
+    2. Serial Port name, eg "COM3", "COM4", "/dev/ttyS0"
