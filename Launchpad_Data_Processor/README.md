@@ -1,9 +1,9 @@
 Launchpad Data Processor
 ===============
-http://energia.nu/
+- Resources
+  1. [Energia IDE](http://energia.nu/)
+  2. [Energia Reference](http://energia.nu/Reference_Index.html)
 
-Devboard:EK-TM4C123GXL
-Microcontroller:TM4C123GH6PM
-
-http://www.ti.com/tool/ek-tm4c123gxl
-http://www.ti.com/product/tm4c123gh6pm
+- General Information
+  1. Devboard:[EK-TM4C123GXL](http://www.ti.com/tool/ek-tm4c123gxl)
+  2. Microcontroller:[TM4C123GH6PM](http://www.ti.com/product/tm4c123gh6pm)
