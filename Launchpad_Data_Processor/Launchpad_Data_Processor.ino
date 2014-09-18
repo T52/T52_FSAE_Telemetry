@@ -142,10 +142,9 @@ void setup() {
       int timeCheck = millis()/1000;
       while(Serial2.available() < 2)
       {
-        Serial.println("")
         if((millis()/1000 - timeCheck) > 5) break;
       }
-      if(Serial2.available() > 1)
+      if((Serial2.available() > 1) && (Serial2.available() < 100))
       {
         char start_buf[10] = "";
         Serial2.readBytes(start_buf, Serial2.available());
@@ -162,8 +161,17 @@ void setup() {
           continue;
         }
       }
-      else continue;
-     
+      else 
+      {
+        char error_buf[1] = "";
+        while(Serial2.available() > 0)
+        {
+          Serial.print(".");
+          Serial2.readBytes(error_buf, 1);
+        }
+        Serial.println("Buffer Flushed.");
+        continue;
+      }
       ok_count++;
       Serial.flush();
       //Serial.print(ok_count);
