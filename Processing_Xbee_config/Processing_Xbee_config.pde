@@ -6,7 +6,7 @@ Serial Xbee;  // The serial port
 
 void setup() {
   // Open the port you are using at the rate you want:
-  Xbee = new Serial(this, "COM10", 115200);
+  Xbee = new Serial(this, "COM12", 115200);
 }
 
 void delay(int delay)
@@ -17,7 +17,8 @@ void delay(int delay)
 
 void draw() {
   // Expand array size to the number of bytes you expect
-  byte[] tStor = new byte[10];
+  byte[] tStor = new byte[3];
+  String tString = "";
 /*
   while (myPort.available() > 0) {
     tStor = Xbee.readBytes();
@@ -37,9 +38,12 @@ void draw() {
       println("Printed: +++");
       while(Xbee.available() > 0) Xbee.readBytesUntil('\r', tStor);
 
-      if(tStor[0]==79 && tStor[1]==75 && tStor[2]==13 && tStor[3]==0 && tStor[4]==0){ // if tStor=="OK\r"
+      tString = new String(tStor);
+
+      if(tString.equals("OK\r"))
+      {
         Xbee.clear();//CLEAR SERIAL BUFFER
-        tStor =  new byte[10]; //CLEAR STOR BUFFER
+        tStor =  new byte[3]; //CLEAR STOR BUFFER
         okstate++; //INCREMENT STATE
         print("OK found, State:");
         println(okstate);
@@ -54,11 +58,15 @@ void draw() {
     else if(okstate == 1){
       Xbee.write("atap 0");
       println("Printed: atap 0");
-      while(Xbee.available() > 0) Xbee.readBytesUntil('\r', tStor);
 
-      if(tStor[0]==79 && tStor[1]==75 && tStor[2]==13 && tStor[3]==0 && tStor[4]==0){ // if tStor=="OK\r"
+      if(Xbee.available() > 0) Xbee.readBytesUntil('\r', tStor);
+      
+      tString = new String(tStor);
+
+      if(tString.equals("OK\r"))
+      {
         Xbee.clear();//CLEAR SERIAL BUFFER
-        tStor =  new byte[10]; //CLEAR STOR BUFFER
+        tStor =  new byte[3]; //CLEAR STOR BUFFER
         okstate++; //INCREMENT STATE
         print("OK found, State:");
         println(okstate);
@@ -73,14 +81,17 @@ void draw() {
       Xbee.write("atwr");
       println("Printed: atwr");
       println("Serial read was pre: ");
-      println(tStor);
-      while(Xbee.available() > 0) Xbee.readBytesUntil('\r', tStor);
+      println(tStore);
+      if(Xbee.available() > 0) Xbee.readBytesUntil('\r', tStor);
       println("Serial read was aft read: ");
       println(tStor);
+      
+      tString = new String(tStor);
 
-      if(tStor[0]==79 && tStor[1]==75 && tStor[2]==13 && tStor[3]==0 && tStor[4]==0){ // if tStor=="OK\r"
+      if(tString.equals("OK\r"))
+      {
         Xbee.clear();//CLEAR SERIAL BUFFER
-        tStor =  new byte[10]; //CLEAR STOR BUFFER
+        tStor =  new byte[3]; //CLEAR STOR BUFFER
         okstate++; //INCREMENT STATE
         print("OK found, State:");
         println(okstate);
