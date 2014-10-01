@@ -824,7 +824,7 @@ void controlEvent(ControlEvent theEvent) {
                              //  being read from the serial port.
     }
 
-    saveJSONObject(plotterConfigJSON, topSketchPath+"/plotter_config.json");
+    saveJSONObject(plotterConfigJSON, topSketchPath+"/datalog_config.json");
   }
 
   setChartSettings();
