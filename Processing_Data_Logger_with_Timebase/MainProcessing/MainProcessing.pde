@@ -32,7 +32,7 @@ import java.util.*;
 import java.util.zip.*; 
 
 //===================================Program Settings====================================
-String serialPortName = "COM6";          //  Select Serial port to connect to.
+String serialPortName = "COM5";          //  Select Serial port to connect to.
 int Baudrate = 115200;                     //  set data rate
 
 int sigNum = 6;                         //  Allows for varied number of signals, for testing
@@ -118,7 +118,7 @@ void setup() {
   
   //~~~~~~~~~~~~~~~~~~~~~~~~~~~~graph settings save file~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   topSketchPath = sketchPath;
-  plotterConfigJSON = loadJSONObject(topSketchPath+"/datalog_config.json");
+  plotterConfigJSON = loadJSONObject(topSketchPath+"/plotter_config.json");
   
   //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~create GUI  object~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   cp5 = new ControlP5(this);
@@ -149,7 +149,7 @@ void setup() {
     //~~~~~~~~~~~~~~~save some default plotter configuration settings~~~~~~~~~~~~~~~~~~~
     plotterConfigJSON.setString("lgMinX", "-100");             //  Set X-axis minimum
     plotterConfigJSON.setString("lgMaxX", "0");                //  Set X-axis maximum
-    saveJSONObject(plotterConfigJSON, topSketchPath+"/datalog_config.json");
+    saveJSONObject(plotterConfigJSON, topSketchPath+"/plotter_config.json");
     
     //~~~~~~~~~~~~~~~~~~~~build x axis values for the line graph~~~~~~~~~~~~~~~~~~~~~~~~
     for (int i=0; i<lineGraphValues.length; i++) {            //  Loops through data 
@@ -168,7 +168,7 @@ void setup() {
     plotterConfigJSON.setString("lgMaxX", "0");              //  Set X-axis maximum
     plotterConfigJSON.setString("Plot Pause", "0");          //  Unpause by default
      plotterConfigJSON.setString("Transmit Stat", "0");      //  Not transmitting by default
-    saveJSONObject(plotterConfigJSON, topSketchPath+"/datalog_config.json");
+    saveJSONObject(plotterConfigJSON, topSketchPath+"/plotter_config.json");
     
     //~~~~~~~Setup array of lists used to plot a continually expanding data set~~~~~~~~~
     for(i=0; i<sigNum; i++)
@@ -514,7 +514,7 @@ void draw() {
         plotterConfigJSON.setString("lgMaxX", timeBase[timeIndexMax]+ "");
       }
       
-      saveJSONObject(plotterConfigJSON, topSketchPath+"/datalog_config.json");
+      saveJSONObject(plotterConfigJSON, topSketchPath+"/plotter_config.json");
       setChartSettings();   //  The x axis is thus updated by referencing the saved value.
       
                             //  Given the range, checks whether graph has sufficient
@@ -574,8 +574,36 @@ void draw() {
              }  
         }
         }
-        catch (Exception e)  {
-          println("ERROR");
+        catch (ArrayIndexOutOfBoundsException e)  {
+                           //  This adds error checking if an invalid index position is specified 
+                           //  by the variables above. This can occur as a result of an array
+                           //  length mismatch, where one array has become shorter or longer than others.
+                           
+                           //  The routine  resets the index markers, and removes additional entries
+                           //  from each data set, so that they match for future reference.
+          println("Error: During plotting a mismatch in array sizes was detected");
+          println("Resetting time index variables");
+          timeIndexMax = currentDataSet.length-1;
+          timeIndexMin = 0;
+          println("Removing additional samples to match data set dimensions");
+          int r=0;
+          int lengthMin = 0;
+          println("Previous dimensions were:");
+          for(r=0; r<sigNum; r++)
+          {
+            if(r==0)  lengthMin = r;
+            if(r>0 && (lineGraphDataList[r].size() < lineGraphDataList[r-1].size())) lengthMin = r;
+            println(lineGraphDataList[r].size());
+          }
+          println("New dimensions are:");
+          for(r=0; r<sigNum; r++)
+          {
+            while(lineGraphDataList[r].size() > lineGraphDataList[lengthMin].size())
+              lineGraphDataList[r].remove(lineGraphDataList[r].size()-1);
+            println(lineGraphDataList[r].size());
+          }
+
+          
         }
       }    
     }
@@ -796,7 +824,7 @@ void controlEvent(ControlEvent theEvent) {
                              //  being read from the serial port.
     }
 
-    saveJSONObject(plotterConfigJSON, topSketchPath+"/datalog_config.json");
+    saveJSONObject(plotterConfigJSON, topSketchPath+"/plotter_config.json");
   }
 
   setChartSettings();
