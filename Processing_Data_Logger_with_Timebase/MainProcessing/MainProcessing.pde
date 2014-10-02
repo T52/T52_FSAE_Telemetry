@@ -32,7 +32,7 @@ import java.util.*;
 import java.util.zip.*; 
 
 //===================================Program Settings====================================
-String serialPortName = "COM6";          //  Select Serial port to connect to.
+String serialPortName = "COM5";          //  Select Serial port to connect to.
 int Baudrate = 115200;                     //  set data rate
 
 int sigNum = 6;                         //  Allows for varied number of signals, for testing
@@ -574,8 +574,36 @@ void draw() {
              }  
         }
         }
-        catch (Exception e)  {
-          println("ERROR");
+        catch (ArrayIndexOutOfBoundsException e)  {
+                           //  This adds error checking if an invalid index position is specified 
+                           //  by the variables above. This can occur as a result of an array
+                           //  length mismatch, where one array has become shorter or longer than others.
+                           
+                           //  The routine  resets the index markers, and removes additional entries
+                           //  from each data set, so that they match for future reference.
+          println("Error: During plotting a mismatch in array sizes was detected");
+          println("Resetting time index variables");
+          timeIndexMax = currentDataSet.length-1;
+          timeIndexMin = 0;
+          println("Removing additional samples to match data set dimensions");
+          int r=0;
+          int lengthMin = 0;
+          println("Previous dimensions were:");
+          for(r=0; r<sigNum; r++)
+          {
+            if(r==0)  lengthMin = r;
+            if(r>0 && (lineGraphDataList[r].size() < lineGraphDataList[r-1].size())) lengthMin = r;
+            println(lineGraphDataList[r].size());
+          }
+          println("New dimensions are:");
+          for(r=0; r<sigNum; r++)
+          {
+            while(lineGraphDataList[r].size() > lineGraphDataList[lengthMin].size())
+              lineGraphDataList[r].remove(lineGraphDataList[r].size()-1);
+            println(lineGraphDataList[r].size());
+          }
+
+          
         }
       }    
     }
