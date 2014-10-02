@@ -1,12 +1,10 @@
-
-
 import processing.serial.*;
 
 Serial Xbee;  // The serial port
 
 void setup() {
   // Open the port you are using at the rate you want:
-  Xbee = new Serial(this, "COM12", 115200);
+  Xbee = new Serial(this, "COM10", 115200);
 }
 
 void delay(int delay)
@@ -15,10 +13,73 @@ void delay(int delay)
   while(millis() - time <= delay);
 }
 
+void Flush_buffer(){
+  byte[] error_buf = new byte[1];//cleanbuff
+  print("FL pre Buffer available = ");
+  println(Xbee.available());
+  
+  while(Xbee.available() > 0){
+     print(".");
+     error_buf = Xbee.readBytes();
+     Xbee.readBytes(error_buf);
+  }
+  println("Buffer Flushed.");
+  print("FL aft Buffer available = ");
+  println(Xbee.available());
+}
+
+class Xbee_setup {
+//  public:
+    String writecommand = "";
+    byte[] tStor = new byte[3];
+    String tString = "";
+    int currstate;
+    
+    void Sendcommand(){
+      Xbee.write(writecommand);
+      print("Printed: ");
+      println(writecommand);
+    }
+    
+    
+    void Readcommand(){
+      if(Xbee.available() > 3){
+        Flush_buffer();
+      }
+
+      while(Xbee.available() == 3){
+        Xbee.readBytesUntil('\r', tStor);
+      }
+      tString = new String(tStor);
+
+
+      if(tString.equals("OK\r")){
+        
+        currstate++;//INCREMENT STATE
+        print("OK found, Incrementing State to:");
+        println(currstate);
+        
+        Xbee.clear();//CLEAR SERIAL BUFFER
+        Flush_buffer();
+        tStor =  new byte[3]; //CLEAR STOR BUFFER
+
+      }
+      else{
+        println("No OK received. Serial read was: ");
+        println(tStor);
+        print("Buffer available = ");
+        println(Xbee.available());
+      }
+    }
+};
+
 void draw() {
   // Expand array size to the number of bytes you expect
-  byte[] tStor = new byte[3];
-  String tString = "";
+  
+  //byte[] tStor = new byte[3];
+  //String tString = "";
+  
+  
 /*
   while (myPort.available() > 0) {
     tStor = Xbee.readBytes();
@@ -29,108 +90,73 @@ void draw() {
     }
   }
 */
-
+  Xbee_setup XSS;
+  XSS = new Xbee_setup();
+  Flush_buffer();
+  Flush_buffer();
+  
   int okstate = 0;
+  int loopcounter = 0;
+  println("Starting Configuration...\n");
  
-  while(okstate <= 4){
+  while(okstate <= 4){ //state machine.
+    
     if(okstate == 0){
-      Xbee.write("+++");
-      println("Printed: +++");
-      while(Xbee.available() > 0) Xbee.readBytesUntil('\r', tStor);
-
-      tString = new String(tStor);
-
-      if(tString.equals("OK\r"))
-      {
-        Xbee.clear();//CLEAR SERIAL BUFFER
-        tStor =  new byte[3]; //CLEAR STOR BUFFER
-        okstate++; //INCREMENT STATE
-        print("OK found, State:");
-        println(okstate);
-      }
-      else{
-        println("No OK received. Serial read was: ");
-        println(tStor);
-      }
-
-
+      XSS.writecommand = "+++";
+      XSS.currstate = okstate;
+      XSS.Sendcommand();
+      delay(1000);//1 sec delay
+      XSS.Readcommand();
+      okstate = XSS.currstate;
     }
     else if(okstate == 1){
-      Xbee.write("atap 0");
-      println("Printed: atap 0");
-
-      if(Xbee.available() > 0) Xbee.readBytesUntil('\r', tStor);
-      
-      tString = new String(tStor);
-
-      if(tString.equals("OK\r"))
-      {
-        Xbee.clear();//CLEAR SERIAL BUFFER
-        tStor =  new byte[3]; //CLEAR STOR BUFFER
-        okstate++; //INCREMENT STATE
-        print("OK found, State:");
-        println(okstate);
-      }
-      else{
-        println("No OK received. Serial read was: ");
-        println(tStor);
-      }
-
-    }     
+      XSS.writecommand = "atap 0\r\n";
+      XSS.currstate = okstate;
+      XSS.Sendcommand();
+      delay(1000);//1 sec delay
+      XSS.Readcommand();
+      okstate = XSS.currstate;
+    }
     else if(okstate == 2){
-      Xbee.write("atwr");
-      println("Printed: atwr");
-      println("Serial read was pre: ");
-      println(tStore);
-      if(Xbee.available() > 0) Xbee.readBytesUntil('\r', tStor);
-      println("Serial read was aft read: ");
-      println(tStor);
-      
-      tString = new String(tStor);
-
-      if(tString.equals("OK\r"))
-      {
-        Xbee.clear();//CLEAR SERIAL BUFFER
-        tStor =  new byte[3]; //CLEAR STOR BUFFER
-        okstate++; //INCREMENT STATE
-        print("OK found, State:");
-        println(okstate);
-      }
-      else{
-        println("No OK received. Serial read was: ");
-        println(tStor);
-      }
-
+      XSS.writecommand = "atwr\r\n";
+      XSS.currstate = okstate;
+      XSS.Sendcommand();
+      delay(1000);//1 sec delay
+      XSS.Readcommand();
+      okstate = XSS.currstate;
     }
     else if(okstate == 3){
-      Xbee.write("atcn");
-      println("Printed: atcn");
-      while(Xbee.available() > 0) Xbee.readBytesUntil('\r', tStor);
-
-      if(tStor[0]==79 && tStor[1]==75 && tStor[2]==13 && tStor[3]==0 && tStor[4]==0){ // if tStor=="OK\r"
-        Xbee.clear();//CLEAR SERIAL BUFFER
-        tStor =  new byte[10]; //CLEAR STOR BUFFER
-        okstate++; //INCREMENT STATE
-        print("OK found, State:");
-        println(okstate);
-      }
-      else{
-        println("No OK received. Serial read was: ");
-        println(tStor);
-      }
-
+      XSS.writecommand = "atcn\r\n";
+      XSS.currstate = okstate;
+      XSS.Sendcommand();
+      delay(1000);//1 sec delay
+      XSS.Readcommand();
+      okstate = XSS.currstate;
+    }
+    else if(okstate == 4){
+      println("OK received. Configuration complete\n");
+      break;
     }
     else{
       println("Xbee Config Error");
-      break;
+      println(okstate);
+      //break;
+      
     }
-    delay(1000);//1 Second Delay in loop
-    println("loop");
+    //delay(2000);//2 Second Delay in loop
+    loopcounter++;
+    print("loop: ");
+    println(loopcounter);
     
+
   }
-  Xbee.clear();
-  Xbee.write("asfaskdjflkasjdlfkjaslkdjflaksdjflkasjdlfkjaslkdjflaksdjflkajsdlkfjalksdjflkajsdlkfjaslkdjflkasdjflkjsdfjaslkdfjlasjdflkajsdlfkjasldkfjlaksdjfalk");
-  println("OK received. Configuration complete");
+  
+  //congrats if you got this far...
+  Xbee.clear(); //Clean yourself up...
+  Flush_buffer();
+  
+  //Xbee.write("asfaskdjflkasjdlfkjaslkdjflaksdjflkasjdlfkjaslkdjflaksdjflkajsdlkfjalksdjflkajsdlkfjaslkdjflkasdjflkjsdfjaslkdfjlasjdflkajsdlfkjasldkfjlaksdjfalk");
+  println("outside loop");
   exit();
     
 }
