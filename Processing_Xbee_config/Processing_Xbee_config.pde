@@ -74,22 +74,7 @@ class Xbee_setup {
 };
 
 void draw() {
-  // Expand array size to the number of bytes you expect
-  
-  //byte[] tStor = new byte[3];
-  //String tString = "";
-  
-  
-/*
-  while (myPort.available() > 0) {
-    tStor = Xbee.readBytes();
-    Xbee.readBytes(tStor);
-    if (tStor != null) {
-      String myString = new String(tStor);
-      println(myString);
-    }
-  }
-*/
+
   Xbee_setup XSS;
   XSS = new Xbee_setup();
   Flush_buffer();
