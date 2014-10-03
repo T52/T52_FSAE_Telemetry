@@ -37,38 +37,37 @@
 
 //===================================Library Includes====================================
 #include <EEPROM.h>
-
+#include <SD.h>
+#include <SPI.h>
 //=====================================Definitions=======================================
 #define dataSetLength 6
 #define EEPROM_TIMEBASE_ADDR 0
 
 //===================================Program Settings====================================
-boolean mockMode = false;                    //  Defines which mode of operation to use.
-                                            //    - True denotes Mock Data Mode
-                                            //    - False denotes Data Acquistion Mode
+boolean mockMode = false;                  //  Defines which mode of operation to use.
+                                           //    - True denotes Mock Data Mode
+                                           //    - False denotes Data Acquistion Mode
 
 boolean sendConfigInfo = true;             //  This is an option to send an initial
-                                            //  set of configuration settings, giving
-                                            //  the plotting program more information
-                                            //  on what data it is handling.
+                                           //  set of configuration settings, giving
+                                           //  the plotting program more information
+                                           //  on what data it is handling.
 
 int configUpdateLimit = 10;                //  If config info strings are enabled,
                                            //  sets the maximum time elapsed before
                                            //  program should send an config update.
-
-boolean retainTimeReference = false;        //  This option reads and writes each time 
-                                           //  base value to EEPROM on each loop to
-                                           //  determine whether a reset has occured.
-                                           //  If reset occurs, then the stored value
-                                           //  is added to the newly generated execution
-                                           //  time.
                                            
-boolean xbeeMode = true;                  //  This condition determines whether Xbees
+boolean xbeeMode = false;                  //  This condition determines whether Xbees
                                            //  are being used. Usually this would be
                                            //  true, except for testing without the
                                            //  Xbee.
+                                           
+boolean SDMode = false;                    //  Condition to execute optional SD
+                                           //  functionality. This is provided for
+                                           //  testing purposes where the SD might
+                                           //  not be used.
 
-int sigNum = 6;                           //  This allows quick changes to be made to
+int sigNum = 6;                            //  This allows quick changes to be made to
                                            //  the number of signals when in mock mode,
                                            //  which helps with testing transmission 
                                            //  capacity.
@@ -180,54 +179,36 @@ void setup() {
     Serial.println("OK received. Configuration complete");
     
   }
-  //~~~~~~~~~~~~~~~~~~~~~~~~~Wait for Information from Plotter~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  /*int buff_length = 6;
-  char xbee_buf[10]; 
-  Serial2.print("+++");
-  delay(1000);
   
-  while(1) 
-  {
-    if(Serial2.available() > buff_length)
-    {
-      Serial2.readBytesUntil('\n', xbee_buf, Serial2.available());
-      Serial.println(xbee_buf);
-      delay(1000);
-    }
-    else if(Serial2.available())
-    {
-      Serial2.readBytesUntil('S', xbee_buf, Serial2.available());
-      Serial.print("Else: ");
-      Serial.println(xbee_buf);
-      
-    }
-  }
-  
- 
-  //while(Serial2.available()) Serial.write(Serial2.read());
-  Serial.println("Waiting on start message...");
-  while((!Serial2.available()) || (!Serial2.find("Start")));
-  Serial.println("Start message received. Beginning transmission");
-  */
   //~~~~~~~~~~~~~~~~~~~~~~~Send Initial Configuration Information~~~~~~~~~~~~~~~~~~~~~~~~
   sendConfigString();
-  
-  //~~~~~~~~~~~~~~~~~~~~~~~~Clear time reference if applicable~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  if(!retainTimeReference)
-  {
-    EEPROM.write(EEPROM_TIMEBASE_ADDR, 0);  //  Set recorded time value to 0
-    EEPROM.write(EEPROM_TIMEBASE_ADDR+1, 0);
-    EEPROM.write(EEPROM_TIMEBASE_ADDR+2, 0);
-  }
 }
-
-
 
 //=================================Main Program Loop=====================================
 void loop() {
-
   float timeElapsed = 0;
   float addedTime = 0;
+  int n = 0;
+  File myFile;
+  
+  //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~SD Card Implementation~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  if(SDMode)                              //  SD only needs to be initialized if SD is being
+  {                                       //  used. Otherwise, initialization will fail.
+    pinMode(10, OUTPUT);
+    
+    if (!SD.begin(4)) {
+      Serial.println("initialization failed!");
+      return;
+    }
+    
+    if(SD.exists("data.txt")){
+      SD.remove("data.txt");
+    }
+        
+    myFile = SD.open("data.txt", FILE_WRITE);
+  }
+  
+  //~~~~~~~~~~~~~~~~~~~~~~~~~~~Generate and Transmit Mock Data~~~~~~~~~~~~~~~~~~~~~~~~~~~
   if(mockMode)                              //  Enters mock data transmission mode
   {
     int ramp = 0; 
@@ -281,6 +262,8 @@ void loop() {
     int n=0;                                // Count loops around print routine
     int i=0;
     boolean transBegin = false;
+    boolean downloadBegin = false;
+    
     for(;;)
     {
       //~~~~~~~~~~~~~~~~~~~~~~~Create simulation data for now~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -294,45 +277,56 @@ void loop() {
          addedTime = execTime;
       }
       
-      //~~~~~~~~~~~~~~~~Check for transmission start signal from plotter~~~~~~~~~~~~~~~~
-      /*if(Serial2.available() > 2)
+      //~~~~~~~~~~~~~~~~~~~~~~~~~Check for signals from plotter~~~~~~~~~~~~~~~~~~~~~~~~~
+     if(xbeeMode)
       {
-        char start_buf[10] = "";
-        Serial2.readBytes(start_buf, Serial2.available());
-        if(String(start_buf) == "!!!")  
+        if(Serial2.available() > 2)
         {
-          transBegin = true;
+          char start_buf[10] = "";
+          Serial2.readBytes(start_buf, Serial2.available());
+          Serial.print("Plotter string received was: ");
+          Serial.println(String(start_buf));
+          if(String(start_buf) == "!!!")  
+          {
+            transBegin = true;
+          }
+          if(String(start_buf) == "~~~")  transBegin = false;
+          if(String(start_buf) == "---")
+          {
+            n=0;
+            initRead = 0;
+            resetTime = execTime;
+          }
         }
-        if(String(start_buf) == "~~~")  transBegin = false;
-        if(String(start_buf) == "---")
-        {
-          EEPROM.write(EEPROM_TIMEBASE_ADDR+2, 0);
-          EEPROM.write(EEPROM_TIMEBASE_ADDR+1, 0);
-          EEPROM.write(EEPROM_TIMEBASE_ADDR, 0);
-          n=0;
-          initRead = 0;
-          resetTime = execTime;
-        }
+        if(!transBegin) continue;
       }
-      if(!transBegin) continue;
-      */
+      else
+      {
+        if(Serial.available() > 2)
+        {
+          char start_buf[10] = "";
+          Serial.readBytes(start_buf, Serial.available());
+          
+          
+          Serial.print("Plotter string received was: ");
+          Serial.println(String(start_buf));
+          if(String(start_buf) == "!!!")  
+          {
+            transBegin = true;
+          }
+          if(String(start_buf) == "~~~")  transBegin = false;
+          if(String(start_buf) == "---")
+          {
+            n=0;
+            initRead = 0;
+            resetTime = execTime;
+          }
+        }
+        if(!transBegin) continue;
+      }
+      
+      //~~~~~~~~~~~~~~~~~~~~~~~~~Generate Data for transmission~~~~~~~~~~~~~~~~~~~~~~~~~~
       execTime = execTime - resetTime;
-      //~~~~~~~~~~~~~~~~~~~~~Refer to stored timebase in EEPROM~~~~~~~~~~~~~~~~~~~~~~~~~
-      if(retainTimeReference)
-      {
-        float timeRead = 0;
-        timeRead = float(EEPROM.read(EEPROM_TIMEBASE_ADDR+2)<<8) + float(EEPROM.read(EEPROM_TIMEBASE_ADDR+1)) + float(EEPROM.read(EEPROM_TIMEBASE_ADDR))/100.0;
-        if((execTime - 0.1) < timeRead) 
-        {
-          if(n == 0)  initRead = timeRead;
-          execTime = execTime + initRead;
-        }
-        
-        EEPROM.write(EEPROM_TIMEBASE_ADDR+2, int(execTime)>>8);
-        EEPROM.write(EEPROM_TIMEBASE_ADDR+1, execTime);
-        EEPROM.write(EEPROM_TIMEBASE_ADDR, int(execTime*100)-int(execTime));
-        
-      }
       
       i++;
       if((i>=10) || (n==0))
@@ -359,19 +353,52 @@ void loop() {
       {
         if(xbeeMode)
         {
-          Serial.println("Sending data...");
-          Serial2.print(currentDataSet[i]);
-          Serial2.print(" ");
-          if(i == (sizeof(currentDataSet)/sizeof(float) - 1)) Serial2.print("\r");
+          if(SDMode)
+          {
+            //SD with Xbee yet to be added, but should be much the same as below
+            Serial.println("SD with Xbee yet to be added, but should be much the same");
+          }
+          else
+          {
+            Serial.println("Sending data...");
+            Serial2.print(currentDataSet[i]);
+            Serial2.print(" ");
+            if(i == (sizeof(currentDataSet)/sizeof(float) - 1)) Serial2.print("\r");
+          }
         }
         else                                  //  If Xbees aren't being used UART1
         {                                     //  is used instead.
-          Serial.print(currentDataSet[i]);
-          Serial.print(" ");
-          if(i == (sizeof(currentDataSet)/sizeof(float) - 1)) Serial.print("\r");
+          if(SDMode)                    
+          {                                   //  If SD selected run SD routines
+            // SD Card Implementation
+            if(myFile) {
+              Serial.println("---- WRITING TO SD ---- "); // Testing if SD Card Works
+              myFile.print(currentDataSet[i]);           // Print dataset to SD Card
+              myFile.print(" ");                         // Formatting
+              if(i == (sizeof(currentDataSet)/sizeof(float) - 1)) myFile.print("\r");
+            }
+            
+            if (n==100)                                 // SD Card Close Loop
+            {                                           // Close to be Impl. by Plotter
+              Serial.println("---- CLOSE SD ----");     // Testing if SD Card Works
+              myFile.close();
+            }
+            
+            //Serial.print(currentDataSet[i]);           // Print dataset to Serial
+            //Serial.print(" ");
+            
+            if(i == (sizeof(currentDataSet)/sizeof(float) - 1)) Serial.print("\r");
+          }
+          else                                //  If SD is not selected, simply print 
+          {                                   //  data to UART1.
+            Serial.print(currentDataSet[i]);           // Print dataset to Serial
+            Serial.print(" ");
+            
+            if(i == (sizeof(currentDataSet)/sizeof(float) - 1)) Serial.print("\r");
+          }
         }
       }
-      delay(25);
+      delay(100);
       n++;                                   //  Increment loop counter
     }                                        
   }                                          
@@ -412,4 +439,3 @@ void sendConfigString()
     }
     return;
 }
-
