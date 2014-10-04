@@ -32,7 +32,7 @@ import java.util.*;
 import java.util.zip.*; 
 
 //===================================Program Settings====================================
-String serialPortName = "COM5";          //  Select Serial port to connect to.
+String serialPortName = "COM3";          //  Select Serial port to connect to.
 int Baudrate = 115200;                     //  set data rate
 
 int sigNum = 6;                         //  Allows for varied number of signals, for testing
@@ -329,7 +329,8 @@ void draw() {
     String todlog = "";
     float maxTimeBase = 0;   
     background(255);                             //  Set Main background colour
-    
+    if(n == 0) println(myString);
+    if(n == 1) println(myString);
     serialEventTriggered = false;
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Check for read errors~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  
     if(!readError) 
@@ -449,8 +450,13 @@ void draw() {
       }
       
       //::::::::::::::::::::::Timer to display most recent sample::::::::::::::::::::::
-      vehicleStats[4].setText(str(timeBase[timeBase.length-1]));
-
+      float timeDiv = 1;
+      if(timeBase[timeBase.length-1] > 60)    timeDiv = 60;
+      if(timeBase[timeBase.length-1] > 3600)  timeDiv = 3600;
+      if(timeDiv == 1) vehicleStats[4].setText(nf(timeBase[timeBase.length-1]/timeDiv, 2, 2) + "s");
+      if(timeDiv == 60) vehicleStats[4].setText(nf(timeBase[timeBase.length-1]/timeDiv, 2, 2) + "m");
+      if(timeDiv == 3600) vehicleStats[4].setText(nf(timeBase[timeBase.length-1]/timeDiv, 2, 2) + "h");
+      
       //:::::::::::::::::::::Add Displays for current Vehicle Stats::::::::::::::::::::
       int x_stats = 880;
       int y_stats = 60;
@@ -476,15 +482,20 @@ void draw() {
       
       //::::::::::::::::::::::::::Save range settings to file::::::::::::::::::::::::::   
       
+      timeDiv = 1;
+      int timeRes = 20;
+
       if(getPlotterConfigString("Plot Pause") == "1"); //  If pause has been pressed,
                                                        //  leave indexes unchanged.
                                                        
       else if(rangeFlag == false)              //  If range slider has not been moved
       {                                        //  or is at full range, set limits
                                                //  to array boundaries.
-
-        plotterConfigJSON.setString("lgMinX", min(timeBase)+ "");
-        plotterConfigJSON.setString("lgMaxX", max(timeBase)+ "");
+        if((max(timeBase)-min(timeBase)) > 60) timeDiv = 60;
+        if((max(timeBase)-min(timeBase)) > 3600) timeDiv = 3600;
+        
+        plotterConfigJSON.setString("lgMinX", (min(timeBase)/timeDiv)+ "");
+        plotterConfigJSON.setString("lgMaxX", (max(timeBase)/timeDiv)+ "");
         timeIndexMax = timeBase.length - 1;    //  Set the maximum index to the length
         timeIndexMin = 0;                      //  of the array.
       }
@@ -509,10 +520,19 @@ void draw() {
           }
           else  timeIndexMax = timeBase.length - 1;
         }
+        
+        if((timeBase[timeIndexMax] - timeBase[timeIndexMin]) > 60) timeDiv = 60;
+        if((timeBase[timeIndexMax] - timeBase[timeIndexMin]) > 3600) timeDiv = 3600;
+        
                             //  Save these ranges to the config file
-        plotterConfigJSON.setString("lgMinX", timeBase[timeIndexMin]+ "");
-        plotterConfigJSON.setString("lgMaxX", timeBase[timeIndexMax]+ "");
+        plotterConfigJSON.setString("lgMinX", (timeBase[timeIndexMin]/timeDiv)+ "");
+        plotterConfigJSON.setString("lgMaxX", (timeBase[timeIndexMax]/timeDiv)+ "");
       }
+      
+      if((max(timeBase)/timeDiv) > 1000) timeRes = 15;
+      if((max(timeBase)/timeDiv) > 10000) timeRes = 10;
+      if((max(timeBase)/timeDiv) > 100000) timeRes = 5;
+      plotterConfigJSON.setString("lgDivX", timeRes + "");
       
       saveJSONObject(plotterConfigJSON, topSketchPath+"/datalog_config.json");
       setChartSettings();   //  The x axis is thus updated by referencing the saved value.
@@ -545,35 +565,29 @@ void draw() {
           if(i == speedArrayRef)  //  The array references are updated after a config 
           {                       //  string is recieved, and depends on the data set names.
             
-            vehicleStats[0].setText(str(currentDataSet[currentDataSet.length-1]) + "km/h");
-            vehicleStats[1].setText(str(max(currentDataSet)) + "km/h");
+            vehicleStats[0].setText(nf(currentDataSet[currentDataSet.length-1], 0, 0) + "km/h");
+            vehicleStats[1].setText(nf(max(currentDataSet), 0, 0) + "km/h");
           }
           if(i == batteryArrayRef)
-            vehicleStats[2].setText(str(currentDataSet[currentDataSet.length-1]) + "%");
+            vehicleStats[2].setText(nf(currentDataSet[currentDataSet.length-1], 2, 2) + "%");
           if(i == tempArrayRef)
-            vehicleStats[3].setText(str(currentDataSet[currentDataSet.length-1]) + "°C");
+            vehicleStats[3].setText(nf(currentDataSet[currentDataSet.length-1], 2 ,2) + "°C");
         }
         
         LineGraph.GraphColor = graphColors[i]; //  Sets the color for each data set
-        try  {
+        try  
+        {
           if (int(getPlotterConfigString("lgVisible"+(i+1))) == 1)
           { 
                             //  Plots a subset of the each array depending on the index 
                             //  limits determined.
-             if(timeBase[timeBase.length-1] < 60)
-             {
-               LineGraph.LineGraph(subset(timeBase, timeIndexMin, (timeIndexMax - timeIndexMin)),
+
+             LineGraph.LineGraph(subset(timeBase, timeIndexMin, (timeIndexMax - timeIndexMin)),
                              subset(currentDataSet, timeIndexMin, (timeIndexMax - timeIndexMin)));
-             }
-             else
-             {
-               float[]  timeBaseDiv = new float[timeBase.length];
-               for(int d=0; d<timeBaseDiv[timeBaseDiv.length-1]; d++)  timeBaseDiv[d] = timeBase[d]/60;
-               LineGraph.LineGraph(subset(timeBase, timeIndexMin, (timeIndexMax - timeIndexMin)),
-                             subset(currentDataSet, timeIndexMin, (timeIndexMax - timeIndexMin)));
-             }  
+            }
+
         }
-        }
+        
         catch (ArrayIndexOutOfBoundsException e)  {
                            //  This adds error checking if an invalid index position is specified 
                            //  by the variables above. This can occur as a result of an array
@@ -627,11 +641,11 @@ void setChartSettings() {
     
   LineGraph.yLabel="Value";
   LineGraph.Title="";  
-  LineGraph.xDiv=20;  
-  LineGraph.xMax=int(getPlotterConfigString("lgMaxX")); 
-  LineGraph.xMin=int(getPlotterConfigString("lgMinX"));  
-  LineGraph.yMax=int(getPlotterConfigString("lgMaxY")); 
-  LineGraph.yMin=int(getPlotterConfigString("lgMinY"));
+  LineGraph.xDiv=int(getPlotterConfigString("lgDivX"));  
+  LineGraph.xMax=float(getPlotterConfigString("lgMaxX")); 
+  LineGraph.xMin=float(getPlotterConfigString("lgMinX"));  
+  LineGraph.yMax=float(getPlotterConfigString("lgMaxY")); 
+  LineGraph.yMin=float(getPlotterConfigString("lgMinY"));
 }
 
 
@@ -800,6 +814,8 @@ void controlEvent(ControlEvent theEvent) {
                               //  If triggered by the "Save & Quit" button
     else if (theEvent.isAssignableFrom(Button.class) && parameter == "Save & Quit")
     {
+      serialPort.write("~~~");                           //  Stops transmission
+      
       output.flush();                                    //  Flushes the output variable
       output.close();                                    //  Closes the output
       exit();                                            //  Closes the program
