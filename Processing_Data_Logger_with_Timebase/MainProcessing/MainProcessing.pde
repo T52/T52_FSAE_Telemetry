@@ -1,4 +1,4 @@
-/*                                                                         12th JULY 2014
+/*                                                                           6TH OCT 2014
 =========================================================================================
 ======================== Engineering Design 3A - FSAE TEAM 52 ===========================
 =========================================================================================
@@ -32,7 +32,7 @@ import java.util.*;
 import java.util.zip.*; 
 
 //===================================Program Settings====================================
-String serialPortName = "COM5";          //  Select Serial port to connect to.
+String serialPortName = "COM8";          //  Select Serial port to connect to.
 int Baudrate = 115200;                     //  set data rate
 
 int sigNum = 6;                         //  Allows for varied number of signals, for testing
@@ -127,6 +127,7 @@ void setup() {
   if (!mockupSerial)  
   {
     serialPort = new Serial(this, serialPortName, Baudrate);
+    xbeesetupfunct();//run xbee config
     serialPort.write("~~~");                      //  Stop current transmission
     while(serialPort.available() > 0) serialPort.readBytesUntil('\r', inBuffer);
     serialPort.clear();
