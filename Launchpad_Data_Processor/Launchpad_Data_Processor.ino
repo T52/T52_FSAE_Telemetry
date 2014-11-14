@@ -1,4 +1,4 @@
-/*                                                                   25th SEPTEMBER 2014
+/*                                                                    14th NOVEMBER 2014
 ========================================================================================
 ========================= Engineering Design 3A - FSAE TEAM 52 =========================
 ========================================================================================
@@ -57,12 +57,12 @@ int configUpdateLimit = 10;                //  If config info strings are enable
                                            //  sets the maximum time elapsed before
                                            //  program should send an config update.
                                            
-boolean xbeeMode = false;                  //  This condition determines whether Xbees
+boolean xbeeMode = true;                  //  This condition determines whether Xbees
                                            //  are being used. Usually this would be
                                            //  true, except for testing without the
                                            //  Xbee.
                                            
-boolean SDMode = false;                    //  Condition to execute optional SD
+boolean SDMode = true;                    //  Condition to execute optional SD
                                            //  functionality. This is provided for
                                            //  testing purposes where the SD might
                                            //  not be used.
@@ -72,10 +72,12 @@ int sigNum = 6;                            //  This allows quick changes to be m
                                            //  which helps with testing transmission 
                                            //  capacity.
                                            
+int dataRateDelay = 10;                  //  Sets the delay between each transmission
+                                           
 //================================Setup Global Variables=================================                                            
 float bdata = 0.00;   //set start point on 'B' data stream
 float binc = 0.20;    //set increment on 'B' data stream
-
+File myFile;
                                             //  These are default names for data sets.
                                             //  They may be changed freely by user, or 
                                             //  program functions.
@@ -95,8 +97,9 @@ void setup() {
                                             //  9600, 14400, 19200, 38400, 57600, 
                                             //  115200, 230400, 460800, 921600
   Serial2.begin(115200);
-                                            
+                                          
   //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Xbee Configuration~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  Serial.println("----------Configuring Transmitting Xbee Module----------");
   if(xbeeMode)
   {
     int ok_count = 0;
@@ -176,7 +179,44 @@ void setup() {
       //Serial.println(" OK found");  
     }  while(ok_count < 4); 
     
-    Serial.println("OK received. Configuration complete");
+    Serial.println("OK received. Xbee Configuration complete\n");
+    
+      
+  //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~SD Card Implementation~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  if(SDMode)                              //  SD only needs to be initialized if SD is being
+  {                                       //  used. Otherwise, initialization will fail.
+    Serial.println("----------Configuring SD Card Backup----------");
+    pinMode(10, OUTPUT);                  //  Setup pin configuration
+    
+    if (!SD.begin(4)) {                   //  Check if SD card is present
+      Serial.println("Initialization failed: Card may not be present");
+      return;
+    }
+                                          //  Delete existing data on SD card
+    Serial.println("Erasing existing data on card...");
+    boolean fileFlag = true;
+    int m=0;
+    while(fileFlag)
+    {
+       char fileName[15];
+       sprintf(fileName, "data%d.txt", m);
+       if(SD.exists(fileName))  
+       {
+         Serial.print("Removing ");
+         Serial.println(fileName);
+         SD.remove(fileName);
+       }
+       else fileFlag = false;
+       m++;
+    }
+    Serial.println("All files removed");
+    
+                                        //  Create new file
+    Serial.println("Creating file: data0.txt\n");    
+    myFile = SD.open("data0.txt", FILE_WRITE);
+    Serial.println("SD configuration complete.");
+    
+  }
     
   }
   
@@ -188,144 +228,170 @@ void setup() {
 void loop() {
   float timeElapsed = 0;
   float addedTime = 0;
-  int n = 0;
-  File myFile;
+  float execTime = 0;
+  float initRead = 0;
+  float resetTime = 0;
+  int n=0;                                // Count loops around print routine
+  int i=0;
+  int transStat = 0;
+  int prevStat = 0;
+  boolean downloadBegin = false;
+  boolean transBegin = false;
+  float batteryLevel = 100;                 //  100% battery by default
+  float vehicleSpeed = 0;                   //  Speed starts at 0ms
+  float vehicleAccel = 0;                   //  Acceleration starts at 0ms^2
+  float engineTemp = 20;                    //  Engine temperature starts at 20 degrees
+  int vehicleIndicators = 0;
   
-  //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~SD Card Implementation~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  if(SDMode)                              //  SD only needs to be initialized if SD is being
-  {                                       //  used. Otherwise, initialization will fail.
-    pinMode(10, OUTPUT);
+  for(;;)
+  {
+    //~~~~~~~~~~~~~~~~~~~~~~~Create simulation data for now~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    execTime = float(millis())/1000;     //  millis command is a long int that 
     
-    if (!SD.begin(4)) {
-      Serial.println("initialization failed!");
-      return;
+    timeElapsed = execTime - addedTime;     //  Checks how much time has elapsed,
+                                            //  if it has been more than 5 seconds
+    if((timeElapsed > configUpdateLimit) && sendConfigInfo) 
+    {                                       //  since last config update, sends a 
+       sendConfigString();                  //  config string.
+       addedTime = execTime;
     }
     
-    if(SD.exists("data.txt")){
-      SD.remove("data.txt");
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~SD Download Routine~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                                  //  If a download is requested, no further data needs
+                                  //  to be read/generated/logged to SD. If information
+                                  //  was still being logged/transmitted, data will be 
+                                  //  jumbled and SD writing happening simultaneously to
+                                  //  reading.
+    
+    if(downloadBegin && myFile)
+    {
+      downloadSD();
+      downloadBegin = false;
+      Serial2.print("#\r");
     }
+      
+    
+    //~~~~~~~~~~~~~~~~~~~~~~~~~Check for signals from plotter~~~~~~~~~~~~~~~~~~~~~~~~~
+    if(xbeeMode)
+    {
+      if(Serial2.available() > 2)
+      {
+        char start_buf[10] = "";
+        Serial2.readBytes(start_buf, Serial2.available());
+        Serial.print("Received string was: ");
+        Serial.println(String(start_buf));
         
-    myFile = SD.open("data.txt", FILE_WRITE);
-  }
-  
-  //~~~~~~~~~~~~~~~~~~~~~~~~~~~Generate and Transmit Mock Data~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  if(mockMode)                              //  Enters mock data transmission mode
-  {
-    int ramp = 0; 
-    for(;;)                                 //  Loops in this mode forever
-    {
-           //~~~~~~~~~~~~~~~Print mock data string to serial port~~~~~~~~~~~~~~~~~~~~~~~~
-           float exectime = float(millis())/1000; //  millis command is a long int that 
-                                                  //  contains program execute time in ms.
-                                                 
-           Serial2.print(exectime);                // 'T' data stream 
-           Serial2.print(" ");
-           Serial2.print(ramp);
-           Serial2.print(" ");
-           ramp += 1;
-           
-           int i=2;
-           for(i; i < sigNum; i++)
-           {
-             Serial2.print(random(0,1000));          // 'A' data stream
-             Serial2.print(" ");
-           }
-           Serial2.print(" \r");
-           
-           delay(25);//delay in ms 250 = 4 times a second
-           
-           timeElapsed = exectime - addedTime;     //  Checks how much time has elapsed,
-                                                   //  if it has been more than 5 seconds
-                                                   /*
-           if((timeElapsed > configUpdateLimit) && sendConfigInfo) 
-           {                                       //  since last config update, sends a 
-             sendConfigString();                   //  config string.
-             addedTime = exectime;
-           }
-           */
-           
-  
-      }
-  }
-  else                                      //  Enters data acquisition mode  
-  {
-                                            //  Creates realistic string of variables as 
-                                            //  to those that would be expected.
-    float execTime = 0;
-    float batteryLevel = 100;               //  100% battery by default
-    float vehicleSpeed = 0;                 //  Speed starts at 0ms
-    float vehicleAccel = 0;                 //  Acceleration starts at 0ms^2
-    float engineTemp = 20;                   //  Engine temperature starts at 20 degrees
-    int vehicleIndicators = 0;
-    float initRead = 0;
-    float resetTime = 0;
-    int n=0;                                // Count loops around print routine
-    int i=0;
-    boolean transBegin = false;
-    boolean downloadBegin = false;
-    
-    for(;;)
-    {
-      //~~~~~~~~~~~~~~~~~~~~~~~Create simulation data for now~~~~~~~~~~~~~~~~~~~~~~~~~~~
-      execTime = float(millis())/1000;     //  millis command is a long int that 
-      
-      timeElapsed = execTime - addedTime;     //  Checks how much time has elapsed,
-                                              //  if it has been more than 5 seconds
-      if((timeElapsed > configUpdateLimit) && sendConfigInfo) 
-      {                                       //  since last config update, sends a 
-         sendConfigString();                  //  config string.
-         addedTime = execTime;
-      }
-      
-      //~~~~~~~~~~~~~~~~~~~~~~~~~Check for signals from plotter~~~~~~~~~~~~~~~~~~~~~~~~~
-     if(xbeeMode)
-      {
-        if(Serial2.available() > 2)
+        if(String(start_buf) == "!!!")  
         {
-          char start_buf[10] = "";
+          Serial.println("----------Start Transmission Signal Received----------");
+          transBegin = true;
+        }
+        if(String(start_buf) == "~~~")  
+        {
+          Serial.println("----------Stop Transmission Signal Received----------");
+          transBegin = false;
+        }
+        if(String(start_buf) == "---")
+        {
+          Serial.println("----------Timer Reset Signal Received----------");
+          Serial2.println("$");
+          Serial.println("Returned reset acknowledgement.");
+          while(Serial2.available() < 2);
+          memset(&start_buf, 0, sizeof(start_buf));
           Serial2.readBytes(start_buf, Serial2.available());
-          Serial.print("Plotter string received was: ");
-          Serial.println(String(start_buf));
-          if(String(start_buf) == "!!!")  
-          {
-            transBegin = true;
-          }
-          if(String(start_buf) == "~~~")  transBegin = false;
-          if(String(start_buf) == "---")
-          {
-            n=0;
-            initRead = 0;
-            resetTime = execTime;
-          }
+          Serial.print("Confirmation received: ");;
+          Serial.println(start_buf);
+           
+          n=0;
+          initRead = 0;
+          resetTime = execTime;
+          createNewSDFile();
         }
-        if(!transBegin) continue;
-      }
-      else
-      {
-        if(Serial.available() > 2)
+        if(String(start_buf) == "===")
         {
-          char start_buf[10] = "";
-          Serial.readBytes(start_buf, Serial.available());
-          
-          
-          Serial.print("Plotter string received was: ");
-          Serial.println(String(start_buf));
-          if(String(start_buf) == "!!!")  
-          {
-            transBegin = true;
-          }
-          if(String(start_buf) == "~~~")  transBegin = false;
-          if(String(start_buf) == "---")
-          {
-            n=0;
-            initRead = 0;
-            resetTime = execTime;
-          }
+          Serial.println("Initiating SD Download");
+          downloadBegin = true;
+          Serial.println(downloadBegin);
         }
-        if(!transBegin) continue;
+        char error_buf[1] = "";
+        while(Serial2.available() > 0)
+        {
+          Serial.print(".");
+          Serial2.readBytes(error_buf, 1);
+        }
+        Serial.println("Buffer Flushed.\n"); 
+        
       }
-      
+      if(!transBegin) continue;
+    }
+    else
+    {
+      if(Serial.available() > 2)
+      {
+        char start_buf[10] = "";
+        Serial.readBytes(start_buf, Serial.available());
+        
+        
+        Serial.print("Plotter string received was: ");
+        Serial.println(String(start_buf));
+        if(String(start_buf) == "!!!")  
+        {
+          transBegin = true;
+        }
+        if(String(start_buf) == "~~~")  transBegin = false;
+        if(String(start_buf) == "---")
+        {
+          n=0;
+          initRead = 0;
+          resetTime = execTime;
+        }
+        if(String(start_buf) == "===")
+        {
+          Serial.println("Initiating SD Download");
+          downloadBegin = true;
+          Serial.println(downloadBegin);
+        }
+        
+      }
+      if(!transBegin) continue;
+    }
+    
+    if(mockMode)
+    {
+      if(n >= 500) continue;
+      //~~~~~~~~~~~~~~~Print mock data string to serial port~~~~~~~~~~~~~~~~~~~~~~~~                                          
+         Serial2.print(execTime);                // 'T' data stream 
+         Serial2.print(" ");
+         if(myFile) {
+          myFile.print(execTime);           // Print dataset to SD Card
+          myFile.print(" ");                         // Formatting
+         }
+         int i=1;
+         for(i; i < sigNum; i++)
+         {
+           float mockSig = random(0,1000);
+           Serial2.print(mockSig);               // 'A' data stream
+           Serial2.print(" ");
+           
+                                                 //  SD Card Implementation
+          if(myFile) {
+            myFile.print(mockSig);           // Print dataset to SD Card
+            myFile.print(" ");                         // Formatting
+           }
+         }
+         myFile.print("\r");
+         Serial2.print(" \r");
+         delay(dataRateDelay);
+         n++; 
+         
+    }
+    else
+    {
       //~~~~~~~~~~~~~~~~~~~~~~~~~Generate Data for transmission~~~~~~~~~~~~~~~~~~~~~~~~~~
+                                                //  Creates realistic string of variables as 
+                                                //  to those that would be expected.
+      
+      
       execTime = execTime - resetTime;
       
       i++;
@@ -355,12 +421,19 @@ void loop() {
         {
           if(SDMode)
           {
-            //SD with Xbee yet to be added, but should be much the same as below
-            Serial.println("SD with Xbee yet to be added, but should be much the same");
+                                              //  Transmit each data set
+            Serial2.print(currentDataSet[i]);
+            Serial2.print(" ");
+            if(i == (sizeof(currentDataSet)/sizeof(float) - 1)) Serial2.print("\r");
+                                              //  SD Card Implementation
+            if(myFile) {
+              myFile.print(currentDataSet[i]);           // Print dataset to SD Card
+              myFile.print(" ");                         // Formatting
+              if(i == (sizeof(currentDataSet)/sizeof(float) - 1)) myFile.print("\r");
+            }
           }
           else
           {
-            Serial.println("Sending data...");
             Serial2.print(currentDataSet[i]);
             Serial2.print(" ");
             if(i == (sizeof(currentDataSet)/sizeof(float) - 1)) Serial2.print("\r");
@@ -398,10 +471,11 @@ void loop() {
           }
         }
       }
-      delay(100);
+      delay(dataRateDelay);
       n++;                                   //  Increment loop counter
-    }                                        
-  }                                          
+    }
+  }                                        
+                                           
   
   // each while loop has a wait 1000 milliseconds before the loop
   // repeats for the output to be constant and not
@@ -437,5 +511,116 @@ void sendConfigString()
       Serial2.print(" \r");
       delay(100);  
     }
+    return;
+}
+
+void downloadSD()
+{
+  String dataSet;
+  int bytesStored = 0;
+  int byteCount = 0;
+          
+                      //  Close and save current SD file
+  Serial.println("SD File Saved.");
+  myFile.close();
+  
+                      //  Determine how many files exist on SD card
+  boolean fileFlag = true;
+  int m=0;
+  char fileName[15];
+  while(fileFlag)
+  {
+     sprintf(fileName, "data%d.txt", m);
+     if(SD.exists(fileName))  
+     {
+       Serial.print(fileName);
+       Serial.println(" exists.");
+     }
+     else  
+     {
+       Serial.print(fileName);
+       Serial.println(" does not exist.");
+       fileFlag = false;
+     }
+     m++;
+  }
+  
+                    //  Issue prompt to GUI on which file should be read
+  Serial.println("Prompting user to select file");
+  Serial2.print("%");
+  for(int u=0; u<(m-1); u++)  Serial2.print(u);
+  Serial2.print("\r");
+                    //  Wait for response from GUI
+  while(Serial2.available() < 3);
+                    //  Read in response
+  char start_buf[10] = "";
+  Serial2.readBytes(start_buf, Serial2.available());
+  Serial.println(start_buf);
+  sprintf(fileName, "data%c.txt", start_buf[2]);
+  Serial.println(fileName);
+  
+                    //  Open selected file
+  if(SD.exists(fileName))  myFile = SD.open(fileName, FILE_READ);
+  else  
+  {
+    Serial.println("File selected does not exist. Download cancelled");
+    return;
+  }
+  
+  bytesStored = myFile.available();
+  Serial.print(bytesStored);
+  Serial.println(" bytes available on SD card.");
+  while(byteCount <= bytesStored)
+  {
+    dataSet = "";
+    for(int r=0; r<sigNum; r++)
+    {
+      String sampBuffer = "";
+      int s=0;
+      char sampChar;
+      do
+      {
+        sampChar = myFile.read();
+        byteCount++;
+        sampBuffer += String(sampChar);
+        s++;
+      }  while((!String(sampChar).equals(" ")) && (byteCount <= bytesStored));
+      dataSet += sampBuffer;
+      if(byteCount > bytesStored) break;
+    }
+    if(byteCount >  bytesStored) break;
+    
+    Serial.print("Data Set was: ");
+    Serial.println(dataSet);
+    Serial2.print(dataSet);
+    delay(100);
+  }
+  Serial2.print("\r\n");
+  Serial2.print("#\r");
+  Serial.println("Download complete.");
+  
+  createNewSDFile();
+  return;
+}
+
+void createNewSDFile()
+{
+                            //  Close current SD file and create a new one
+    Serial.println("Creating new SD File...");
+    myFile.close();
+                            //  Check existing files to determine next file name
+    boolean fileFlag = true;
+    int m=0;
+    char fileName[15];
+    while(fileFlag)
+    {
+       sprintf(fileName, "data%d.txt", m);
+       if(SD.exists(fileName))   m++;  
+       else                      fileFlag = false;
+    }
+    Serial.print("New file name is: ");
+    Serial.println(fileName);
+    myFile = SD.open(fileName, FILE_WRITE);
+    
     return;
 }
