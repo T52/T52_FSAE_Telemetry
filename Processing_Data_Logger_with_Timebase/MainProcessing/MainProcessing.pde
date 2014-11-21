@@ -55,7 +55,7 @@ import java.util.zip.*;
 String serialPortName = "COM12";          // - Select Serial port to connect to.
 int Baudrate = 115200;                   // - Set baud rate (by default 115200).
 
-int sigNum = 6;                          // - Allows for varied number of signals, for 
+int sigNum = 9;                          // - Allows for varied number of signals, for 
                                          // testing purposes.
 
 
@@ -92,7 +92,7 @@ PFont[] textFonts = new PFont[3];        // - Define fonts.
 
                                          // - Define array of text labels for displaying 
                                          // current vehicle stats.
-Textlabel[] vehicleStats = new Textlabel[5];
+Textlabel[] vehicleStats = new Textlabel[7];
 Textarea[] terminal = new Textarea[1];   // - Define text area for GUI terminal display.
 
 
@@ -127,11 +127,21 @@ boolean appendData = false;              // - Flag to determine how information 
                                          // file is requested, the arrays are cleared, and
                                          // downloaded data should be appended rather than
                                          // inserted into existing data.
-
+                                         
+boolean logFlag = false;                 // - Indicates whether a .CSV file has been
+                                         // opened. Without knowing this, the program
+                                         // could inadvertently attempt to close a non-
+                                         // existent file.
 //:::::::::::::::::::::::::::::::::Legend References::::::::::::::::::::::::::::::::::::
-int speedArrayRef = 0;                   // - Act as references to the GUI as whether
-int batteryArrayRef = 0;                 // the expected data sets of speed, battery, and
+int HVVoltageArrayRef = 0;                   // - Act as references to the GUI as whether
+int HVAmpArrayRef = 0;                 // the expected data sets of speed, battery, and
 int tempArrayRef = 0;                    // temperature have been confirmed by the legend.
+int inverterFaultArrayRef = 0;
+int throttleArrayRef = 0;
+int brakeArrayRef = 0;
+int carFaultArrayRef = 0;
+int LVBatteryVoltageArrayRef = 0;
+int energyArrayRef = 0;
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Data Logging Information~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 String topSketchPath = "";               // - Helper for saving the executing 
@@ -176,11 +186,6 @@ void setup()
   topSketchPath = sketchPath;            // - Set sketch path.
                                          // - Set config file location.
   plotterConfigJSON = loadJSONObject(topSketchPath+"/datalog_config.json");
-  
-  //~~~~~~~~~~~~~~~~~~~~~~~~~~Set Datalog name and location~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  dataFolder = "Datalog/";               // - set top level save folder
-  String fileName = new SimpleDateFormat("yyyy-MM-dd'_T['HH''mm''ss'].csv'").format(new Date());
-  output = createWriter(dataFolder + fileName);
   
   //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~create GUI  object~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   cp5 = new ControlP5(this);             // - Create GUI class object
@@ -252,6 +257,10 @@ void setup()
   final int yVehicleStats = 40;
   final int vehicleStatBoxWidth = 100;
   final int vehicleStatBoxHeight = 32;
+  final int xFaultInd = 880;
+  final int yFaultInd = 320;
+  final int faultIndWidth = 20;
+  final int faultIndHeight = 14;
   final int yTerminal = 580;
   final int terminalWidth = 1000;
   final int terminalHeight = 70;
@@ -330,10 +339,11 @@ void setup()
   //:::::::::::::::::::::::::::::::::Reset Timer Button:::::::::::::::::::::::::::::::
   cp5.addButton("Reset Timer").setPosition(xTimerButton, yTimerButton).setWidth(timerButtonWidth);
   cp5.addTextlabel("Timer Label").setPosition(xVehicleStats, yTimerButton + fieldHeight).setColor(fontColors[0]).setText("Current Time").setFont(textFonts[1]);
+  vehicleStats[6] = cp5.addTextlabel("Timer").setPosition(x=xVehicleStats, yTimerButton + 2*fieldHeight).setColor(fontColors[2]).setText("0.00").setFont(textFonts[2]);
   
   fill(0,0,0);                         // - Timer Display box
   stroke(255,255,255);
-  rect(xVehicleStats, yTimerButton + 2*fieldHeight, vehicleStatBoxWidth, vehicleStatBoxHeight);
+  rect(xVehicleStats, yTimerButton + 2*fieldHeight - 2, vehicleStatBoxWidth, vehicleStatBoxHeight);
   
   //::::::::::::::::::::::::::::::::Add Data Set Legend:::::::::::::::::::::::::::::::::
   x = xLegend;
@@ -348,17 +358,20 @@ void setup()
   x = xVehicleStats;
   y = yVehicleStats;
   cp5.addTextlabel("Current Vehicle Stats").setPosition(x, y).setColor(fontColors[0]).setText("Current Vehicle Stats").setFont(textFonts[0]);
-  cp5.addTextlabel("Current Speed Label").setPosition(x, y=y+20).setColor(fontColors[0]).setText("Current Speed:").setFont(textFonts[1]);
-  cp5.addTextlabel("Maximum Speed Label").setPosition(x, y=y+100).setColor(fontColors[0]).setText("Max Speed:").setFont(textFonts[1]);
-  cp5.addTextlabel("Battery Remaining Label").setPosition(x, y=y+100).setColor(fontColors[0]).setText("Battery Remaining:").setFont(textFonts[1]);
-  cp5.addTextlabel("Current Temperature Label").setPosition(x, y=y+100).setColor(fontColors[0]).setText("Current Temperature:").setFont(textFonts[1]);
+  cp5.addTextlabel("HV Voltage Label").setPosition(x, y=y+20).setColor(fontColors[0]).setText("HV Voltage:").setFont(textFonts[1]);
+  cp5.addTextlabel("HV Amp Label").setPosition(x, y=y+50).setColor(fontColors[0]).setText("HV Amp:").setFont(textFonts[1]);
+  cp5.addTextlabel("Throttle Position Label").setPosition(x, y=y+50).setColor(fontColors[0]).setText("Throttle Position:").setFont(textFonts[1]);
+  cp5.addTextlabel("Brake Position Label").setPosition(x, y=y+50).setColor(fontColors[0]).setText("Brake Position:").setFont(textFonts[1]);
+  cp5.addTextlabel("LV Voltage Label").setPosition(x, y=y+50).setColor(fontColors[0]).setText("LV Battery Voltage:").setFont(textFonts[1]);
+  cp5.addTextlabel("Energy Used Label").setPosition(x, y=y+50).setColor(fontColors[0]).setText("Energy Used:").setFont(textFonts[1]);
   
+  vehicleStats[0] = cp5.addTextlabel("HV Voltage").setPosition(x, y=yVehicleStats+40).setColor(fontColors[2]).setText("0.00").setFont(textFonts[2]);
+  vehicleStats[1] = cp5.addTextlabel("HV Amp").setPosition(x, y=y+50).setColor(fontColors[2]).setText("0.00").setFont(textFonts[2]);
+  vehicleStats[2] = cp5.addTextlabel("Throttle Position").setPosition(x, y=y+50).setColor(fontColors[2]).setText("0.00").setFont(textFonts[2]);
+  vehicleStats[3] = cp5.addTextlabel("Brake Position").setPosition(x, y=y+50).setColor(fontColors[2]).setText("0.00").setFont(textFonts[2]);
+  vehicleStats[4] = cp5.addTextlabel("LV Battery Voltage").setPosition(x, y=y+50).setColor(fontColors[2]).setText("0.00").setFont(textFonts[2]);
+  vehicleStats[5] = cp5.addTextlabel("Energy Used").setPosition(x, y=y+50).setColor(fontColors[2]).setText("0.00").setFont(textFonts[2]);
   
-  vehicleStats[0] = cp5.addTextlabel("Current Speed").setPosition(x, y=yVehicleStats+40).setColor(fontColors[2]).setText("0.00").setFont(textFonts[2]);
-  vehicleStats[1] = cp5.addTextlabel("Maximum Speed").setPosition(x, y=y+100).setColor(fontColors[2]).setText("0.00").setFont(textFonts[2]);
-  vehicleStats[2] = cp5.addTextlabel("Battery Remaining").setPosition(x, y=y+100).setColor(fontColors[2]).setText("100%").setFont(textFonts[2]);
-  vehicleStats[3] = cp5.addTextlabel("Current Temperature").setPosition(x, y=y+100).setColor(fontColors[2]).setText("0.00").setFont(textFonts[2]);
-  vehicleStats[4] = cp5.addTextlabel("Timer").setPosition(x, y=y+200).setColor(fontColors[2]).setFont(textFonts[2]);
  
   //:::::::::::::::::::::Add Displays for current Vehicle Stats::::::::::::::::::::
   y = yVehicleStats + 2*fieldHeight - 4;
@@ -368,16 +381,65 @@ void setup()
   
   fill(0,0,0);
   stroke(255, 255, 255);
-  rect(x, y=y+100, vehicleStatBoxWidth, vehicleStatBoxHeight);
+  rect(x, y=y+50, vehicleStatBoxWidth, vehicleStatBoxHeight);
   
   fill(0,0,0);
   stroke(255, 255, 255);
-  rect(x, y=y+100, vehicleStatBoxWidth, vehicleStatBoxHeight);
+  rect(x, y=y+50, vehicleStatBoxWidth, vehicleStatBoxHeight);
   
   fill(0,0,0);
   stroke(255, 255, 255);
-  rect(x, y=y+100, vehicleStatBoxWidth, vehicleStatBoxHeight);
+  rect(x, y=y+50, vehicleStatBoxWidth, vehicleStatBoxHeight);
   
+  fill(0,0,0);
+  stroke(255, 255, 255);
+  rect(x, y=y+50, vehicleStatBoxWidth, vehicleStatBoxHeight);
+  
+  fill(0,0,0);
+  stroke(255, 255, 255);
+  rect(x, y=y+50, vehicleStatBoxWidth, vehicleStatBoxHeight);
+  
+  //::::::::::::::::::::::::::::::Add Fault Indicators:::::::::::::::::::::::::::::
+  x = xFaultInd;
+  y = yFaultInd;
+  cp5.addTextlabel("Vehicle Faults Label").setPosition(x, y=y+50).setColor(fontColors[0]).setText("Vehicle Fault Indicators").setFont(textFonts[1]);
+  cp5.addTextlabel("Inverter Faults Label").setPosition(x, y=y+fieldHeight).setColor(fontColors[0]).setText("Inverter:").setFont(textFonts[1]);
+   
+  fill(0, 255, 0);                      
+  stroke(255);                         
+  rect(x, y=y+fieldHeight, faultIndWidth, faultIndHeight);  
+  
+  fill(0, 255, 0);                      
+  stroke(255);                         
+  rect(x, y=y+fieldHeight, faultIndWidth, faultIndHeight);   
+ 
+  fill(0, 255, 0);                      
+  stroke(255);                         
+  rect(x, y=y+fieldHeight, faultIndWidth, faultIndHeight);   
+ 
+  fill(0, 255, 0);                      
+  stroke(255);                         
+  rect(x, y=y+fieldHeight, faultIndWidth, faultIndHeight);  
+  
+  x = xFaultInd + 50;
+  y = yFaultInd + fieldHeight;
+  cp5.addTextlabel("Car Faults Label").setPosition(x, y=y+50).setColor(fontColors[0]).setText("Car:").setFont(textFonts[1]);  
+  
+  fill(0, 255, 0);                      
+  stroke(255);                         
+  rect(x, y=y+fieldHeight, faultIndWidth, faultIndHeight);  
+  
+  fill(0, 255, 0);                      
+  stroke(255);                         
+  rect(x, y=y+fieldHeight, faultIndWidth, faultIndHeight);   
+ 
+  fill(0, 255, 0);                      
+  stroke(255);                         
+  rect(x, y=y+fieldHeight, faultIndWidth, faultIndHeight);   
+ 
+  fill(0, 255, 0);                      
+  stroke(255);                         
+  rect(x, y=y+fieldHeight, faultIndWidth, faultIndHeight);  
   //:::::::::::::::::::::::::::::::Add terminal window:::::::::::::::::::::::::::::
   terminal[0] = cp5.addTextarea("Terminal").setPosition(leftMargin, yTerminal).setWidth(terminalWidth).setHeight(terminalHeight).setColorBackground(0).setFont(textFonts[0]);  
   terminal[0].setText("--------------------------------------------------------------------------------------------------Data Plotter Terminal Window------------------------------------------------------------------------------------------------------------\n");
@@ -432,7 +494,16 @@ void draw()
     }
     
     //:::::::::::::::::Isolate time base data set into its own array:::::::::::::::::
-    float[] timeBase = lineGraphDataList[0].array();
+    float[] timeBase;
+    try {
+      timeBase = lineGraphDataList[0].array();
+    }
+    catch (ArrayIndexOutOfBoundsException e){
+      println("Error: Timebase array out of bounds triggered due to interrupt. Restarting plot routine now.");
+      timeBase = lineGraphDataList[0].array();
+      return;
+      
+    }
                                                // - Y Coordinates for timeBase LED.
     final int yTimeBase = yErrorField + fieldHeight;
                                                // - Check that timebase is continually 
@@ -465,15 +536,16 @@ void draw()
     float timeDiv = 1;
     if(timeBase[timeBase.length-1] > 60)    timeDiv = 60;
     if(timeBase[timeBase.length-1] > 3600)  timeDiv = 3600;
-    if(timeDiv == 1) vehicleStats[4].setText(nf(timeBase[timeBase.length-1]/timeDiv, 2, 2) + "s");
-    if(timeDiv == 60) vehicleStats[4].setText(nf(timeBase[timeBase.length-1]/timeDiv, 2, 2) + "m");
-    if(timeDiv == 3600) vehicleStats[4].setText(nf(timeBase[timeBase.length-1]/timeDiv, 2, 2) + "h");
+    if(timeDiv == 1) vehicleStats[6].setText(nf(timeBase[timeBase.length-1]/timeDiv, 2, 2) + "s");
+    if(timeDiv == 60) vehicleStats[6].setText(nf(timeBase[timeBase.length-1]/timeDiv, 2, 2) + "m");
+    if(timeDiv == 3600) vehicleStats[6].setText(nf(timeBase[timeBase.length-1]/timeDiv, 2, 2) + "h");
 
     //:::::::::::::::::::::Add Displays for current Vehicle Stats::::::::::::::::::::
     final int xVehicleStats = 880;
     int yVehicleStats = 36 + 2*fieldHeight;
     final int vehicleStatWidth = 100;
     final int vehicleStatHeight = 32;
+    final int yTimerButton = 500;
     
     fill(0,0,0);
     stroke(255, 255, 255);
@@ -481,19 +553,27 @@ void draw()
     
     fill(0,0,0);
     stroke(255, 255, 255);
-    rect(xVehicleStats, yVehicleStats = yVehicleStats+100, vehicleStatWidth, vehicleStatHeight);
+    rect(xVehicleStats, yVehicleStats = yVehicleStats+50, vehicleStatWidth, vehicleStatHeight);
     
     fill(0,0,0);
     stroke(255, 255, 255);
-    rect(xVehicleStats, yVehicleStats = yVehicleStats+100, vehicleStatWidth, vehicleStatHeight);
+    rect(xVehicleStats, yVehicleStats = yVehicleStats+50, vehicleStatWidth, vehicleStatHeight);
     
     fill(0,0,0);
     stroke(255, 255, 255);
-    rect(xVehicleStats, yVehicleStats = yVehicleStats+100, vehicleStatWidth, vehicleStatHeight);
+    rect(xVehicleStats, yVehicleStats = yVehicleStats+50, vehicleStatWidth, vehicleStatHeight);
+    
+    fill(0,0,0);
+    stroke(255, 255, 255);
+    rect(xVehicleStats, yVehicleStats = yVehicleStats+50, vehicleStatWidth, vehicleStatHeight);
+    
+    fill(0,0,0);
+    stroke(255, 255, 255);
+    rect(xVehicleStats, yVehicleStats = yVehicleStats+50, vehicleStatWidth, vehicleStatHeight);
     
     fill(0,0,0);
     stroke(255,255,255);
-    rect(xVehicleStats, yVehicleStats = yVehicleStats+164, vehicleStatWidth, vehicleStatHeight);
+    rect(xVehicleStats, yTimerButton + 2*fieldHeight - 2, vehicleStatWidth, vehicleStatHeight);
     
     //::::::::::::::::::::::::::Save range settings to file::::::::::::::::::::::::::   
     
@@ -575,20 +655,33 @@ void draw()
     for (int i=0;i<sigNum; i++) 
     {
                           //  Puts each data set from list into an array temporarily
-      currentDataSet = lineGraphDataList[i].array();
       
+      try {
+        currentDataSet = lineGraphDataList[i].array();
+      }
+      catch (ArrayIndexOutOfBoundsException e){
+        println("Error: Array out of bounds triggered due to interrupt. Restarting plot routine now.");
+        i=0;
+        continue;
+      }
       if(configReceived)
       {                    //  Update stat displays to reflect their respective value.
-        if(i == speedArrayRef)  //  The array references are updated after a config 
-        {                       //  string is recieved, and depends on the data set names.
-          
-          vehicleStats[0].setText(nf(currentDataSet[currentDataSet.length-1], 0, 0) + "km/h");
-          vehicleStats[1].setText(nf(max(currentDataSet), 0, 0) + "km/h");
-        }
-        if(i == batteryArrayRef)
-          vehicleStats[2].setText(nf(currentDataSet[currentDataSet.length-1], 2, 2) + "%");
-        if(i == tempArrayRef)
-          vehicleStats[3].setText(nf(currentDataSet[currentDataSet.length-1], 2 ,2) + "°C");
+        if(i == HVVoltageArrayRef)
+          vehicleStats[0].setText(nf(currentDataSet[currentDataSet.length-1], 0, 0) + "V");
+        if(i == HVAmpArrayRef)
+          vehicleStats[1].setText(nf(currentDataSet[currentDataSet.length-1], 0, 0));
+        if(i == inverterFaultArrayRef)
+          inverterFaultIndConfig(int(currentDataSet[currentDataSet.length-1]));
+        if(i == throttleArrayRef)
+          vehicleStats[2].setText(nf(currentDataSet[currentDataSet.length-1], 0, 0));
+        if(i == brakeArrayRef)
+          vehicleStats[3].setText(nf(currentDataSet[currentDataSet.length-1], 0, 0));
+        if(i == carFaultArrayRef)
+          vehicleFaultIndConfig(int(currentDataSet[currentDataSet.length-1]));
+        if(i == LVBatteryVoltageArrayRef)
+          vehicleStats[4].setText(nf(currentDataSet[currentDataSet.length-1], 0, 0) + "V");
+        if(i == energyArrayRef)
+          vehicleStats[5].setText(nf(currentDataSet[currentDataSet.length-1], 0, 0));
       }
       
       LineGraph.GraphColor = graphColors[i]; //  Sets the color for each data set
@@ -677,9 +770,14 @@ void setLegendSettings()
   {                                              //  corresponding text labels.
     Textlabel dataLabel = ((Textlabel)cp5.getController("Data Label " + (i+1)));
     dataLabel.setText(legendLabels[i].replace('_', ' '));
-    if(legendLabels[i].equals("Speed")) speedArrayRef = i;
-    if(legendLabels[i].equals("Level")) batteryArrayRef = i;
-    if(legendLabels[i].equals("Engine_Temperature")) tempArrayRef = i;
+    if(legendLabels[i].equals("HV_Voltage")) HVVoltageArrayRef = i;
+    if(legendLabels[i].equals("HV_Amp")) HVAmpArrayRef = i;
+    if(legendLabels[i].equals("Inverter_Faults")) inverterFaultArrayRef = i;
+    if(legendLabels[i].equals("Throttle_Position")) throttleArrayRef = i;
+    if(legendLabels[i].equals("Brake_Position")) brakeArrayRef = i;
+    if(legendLabels[i].equals("Car_Fault_Code")) carFaultArrayRef = i;
+    if(legendLabels[i].equals("LV_Battery_Voltage")) LVBatteryVoltageArrayRef = i;
+    if(legendLabels[i].equals("Energy_Used")) energyArrayRef = i;
   }
   configReceived = true;
   return;
@@ -696,7 +794,13 @@ void refreshDataSets()
                                            // data set. 
   int indexPos = 0;
   int entryShift = 0;
+  String todlog = "";
+  //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~print to file/log~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  todlog = myString;
+  output.println(todlog.replace(" ",",").replace("\r",""));
+  
   nums = split(myString, ' ');
+  
   for(int w=0; w<(lineGraphDataList[0].size()-1); w++)
   {
     if(indexFound)              //  If index position has been found, begin reorganizing 
@@ -756,6 +860,7 @@ void refreshDataSets()
 
 void appendDataSets()
 {
+
   String[] nums;                           // - Array to hold the individual values of each
                                            // data set. 
   String todlog = "";
@@ -765,7 +870,7 @@ void appendDataSets()
   
   //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~print to file/log~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   output.println(todlog.replace(" ",",").replace("\r",""));
-
+  
   //~~~~~~~~~~~~~~~~~~~~~~~~split string at delimiter (space)~~~~~~~~~~~~~~~~~~~~~~~~~
   nums = split(myString, ' ');
   
@@ -797,17 +902,19 @@ void downloadFilePrompt()
   println("Choose SD file No. to download. Existing files are:");
   terminal[0].append("Choose SD file No. to download. Existing files are:\n");
   
-  int c=1;
-  while(myString.charAt(c) != '\r')
+  int c=0;
+  String[] files = split(myString.substring(1, myString.length()-1), " ");
+  
+  while(c < (files.length-1))
   {
-    terminal[0].append("data"+ myString.charAt(c) + ".txt\n");
+    terminal[0].append("data"+ c + ".txt\n");
     c++;
   }
   terminal[0].append("\nEnter only the number specified in the desired file name\n");
   while(getPlotterConfigString("Terminal Command") == "");
   String userFile = getPlotterConfigString("Terminal Command");
   
-  if(myString.indexOf(userFile) < 0)
+  if((int(userFile) >= files.length-1) || (int(userFile) < 0))
   {
     terminal[0].append("Invalid selection. \n\n");
     downloadFilePrompt();
@@ -815,42 +922,84 @@ void downloadFilePrompt()
   else
   {
     terminal[0].append("data"+ userFile + ".txt selected\n\n");
-    String filesStored = new String(trim(myString).substring(1, trim(myString).length()));
-    int[] fileNums = new int[filesStored.length()];
-    for(int i=0; i<filesStored.length(); i++)
-      fileNums[i] = int(str(filesStored.charAt(i)));
+    int fileMax = int(files[files.length-2]);
     
-
-    if((myString.indexOf(userFile)-1) != max(fileNums))
+    if(fileMax != int(userFile))
     {
-
        for(int i=0; i<lineGraphDataList.length; i++)
-       {
          lineGraphDataList[i].clear();                    //  Clears each data set
-         //lineGraphDataList[i].append(0);                  //  Appends a 0 for the first element.   
-       } 
        timeIndexMin = 0;                                //  Resets index min and max to 0
        timeIndexMax = 0;  
     }
-    serialPort.write("%%" + userFile); 
     
-    println("Closing CSV File");
-    terminal[0].append("Closing CSV File\n");
-    output.flush();                                    //  Flushes the output variable
-    output.close();                                    //  Closes the output
-    
-    terminal[0].append("Opening new CSV log file.\n");
-    String downloadName = new SimpleDateFormat("yyyy-MM-dd'_T['HH''mm''ss'][backup].csv'").format(new Date());
-    output = createWriter(dataFolder + downloadName);
+    serialPort.write(userFile); 
   }
   
+  terminal[0].append("Opening new CSV log file.\n");
+  dataFolder = "Datalog/";               // - set top level save folder
+  String fileName = new SimpleDateFormat("yyyy-MM-dd'_T['HH''mm''ss'][backup].csv'").format(new Date());
+  output = createWriter(dataFolder + fileName);
+  terminal[0].append("Download file...\n");
   return;
 }
+
+
+
+
+
+void inverterFaultIndConfig(int inverterStat)
+{
+  final int xFaultInd = 880;
+  final int yFaultInd = 320;
+  final int fieldHeight = 20;
+  final int faultIndWidth = 20;
+  final int faultIndHeight = 14;
+  int x = xFaultInd;
+  int y = yFaultInd + fieldHeight + 50;
+  if((inverterStat & 0x01) == 0x01) {  fill(255, 0, 0);  stroke(255);  rect(x, y=y+fieldHeight, faultIndWidth, faultIndHeight);  }  
+  else                              {  fill(0, 255, 0);  stroke(255);  rect(x, y=y+fieldHeight, faultIndWidth, faultIndHeight);  }
+  if((inverterStat & 0x02) == 0x02) {  fill(255, 0, 0);  stroke(255);  rect(x, y=y+fieldHeight, faultIndWidth, faultIndHeight);  } 
+  else                              {  fill(0, 255, 0);  stroke(255);  rect(x, y=y+fieldHeight, faultIndWidth, faultIndHeight);  }
+  if((inverterStat & 0x04) == 0x04) {  fill(255, 0, 0);  stroke(255);  rect(x, y=y+fieldHeight, faultIndWidth, faultIndHeight);  } 
+  else                              {  fill(0, 255, 0);  stroke(255);  rect(x, y=y+fieldHeight, faultIndWidth, faultIndHeight);  } 
+  if((inverterStat & 0x08) == 0x08) {  fill(255, 0, 0);  stroke(255);  rect(x, y=y+fieldHeight, faultIndWidth, faultIndHeight);  }  
+  else                              {  fill(0, 255, 0);  stroke(255);  rect(x, y=y+fieldHeight, faultIndWidth, faultIndHeight);  } 
+  return;
+}
+
+
+
+
+
+void vehicleFaultIndConfig(int vehicleStat)
+{
+  final int xFaultInd = 880;
+  final int yFaultInd = 320;
+  final int fieldHeight = 20;
+  final int faultIndWidth = 20;
+  final int faultIndHeight = 14;
+  int x = xFaultInd + 50;
+  int y = yFaultInd + fieldHeight + 50;
+  if((vehicleStat & 0x01) == 0x01) {  fill(255, 0, 0);  stroke(255);  rect(x, y=y+fieldHeight, faultIndWidth, faultIndHeight);  }  
+  else                              {  fill(0, 255, 0);  stroke(255);  rect(x, y=y+fieldHeight, faultIndWidth, faultIndHeight);  }
+  if((vehicleStat & 0x02) == 0x02) {  fill(255, 0, 0);  stroke(255);  rect(x, y=y+fieldHeight, faultIndWidth, faultIndHeight);  } 
+  else                              {  fill(0, 255, 0);  stroke(255);  rect(x, y=y+fieldHeight, faultIndWidth, faultIndHeight);  }
+  if((vehicleStat & 0x04) == 0x04) {  fill(255, 0, 0);  stroke(255);  rect(x, y=y+fieldHeight, faultIndWidth, faultIndHeight);  } 
+  else                              {  fill(0, 255, 0);  stroke(255);  rect(x, y=y+fieldHeight, faultIndWidth, faultIndHeight);  } 
+  if((vehicleStat & 0x08) == 0x08) {  fill(255, 0, 0);  stroke(255);  rect(x, y=y+fieldHeight, faultIndWidth, faultIndHeight);  }  
+  else                              {  fill(0, 255, 0);  stroke(255);  rect(x, y=y+fieldHeight, faultIndWidth, faultIndHeight);  } 
+  return;
+}
+
+
+
+
 
 //==========================Handler for reading serial data=========================
 byte[] inBuffer = new byte[500];                  //  Buffer to hold serial message
 void serialEvent(Serial p)
 {
+  
   plotTrigger = false;
   int endIndex = 0;                               // - Identifies the index position
                                                   // of the end of the data set.
@@ -858,8 +1007,7 @@ void serialEvent(Serial p)
   
   for(int i=0; i<499; i++) inBuffer[i] = 0;           // Flushes the buffer of old data.
   
-  serialPort.readBytesUntil('\r', inBuffer);      //  Read serial data into buffer
-                                              
+  serialPort.readBytesUntil('\r', inBuffer);      //  Read serial data into buffer                                            
   for(int i=0; i<499; i++)        //  Checks for invalid characters in buffer. If any are
   {                          //  found, handler returns, and data discarded.
     if(((inBuffer[i] < 48) || (inBuffer[i] > 57)) && inBuffer[i] != 32 && inBuffer[i] != 13 && inBuffer[i] != 0 && inBuffer[i] != 46 && inBuffer[i] != 45)
@@ -979,8 +1127,11 @@ void controlEvent(ControlEvent theEvent) {
                               //  Checks whether the range is set to less than 100%
       if((theEvent.getArrayValue(0) != 0) || (theEvent.getArrayValue(1) != 100))
         rangeFlag = true;     //  If so, then triggers a flag which is referenced when 
-      else                    //  plotting.
+      else                    //  plotting. 
         rangeFlag = false;    //  If not, resets the flag to false.
+      
+      if(lineGraphDataList[0].size() > 1)
+        plotTrigger  = true;
     }
                               //  If triggered by dat set on/off toggles
     else if (theEvent.isAssignableFrom(Toggle.class))
@@ -992,19 +1143,33 @@ void controlEvent(ControlEvent theEvent) {
                               //  If triggered by the "Begin Send" button
     else if(theEvent.isAssignableFrom(Button.class) && parameter == "Start/Stop Transmission")
     {                         //  Checks whether transmission has already been triggered
-      if(getPlotterConfigString("Transmit Stat").equals("0"))
+      if(!downloadFlag)
       {
-        serialPort.write("!!!");                       //  If not, sends !!! to serial 
-        value = 1 + "";                                //  and sets the config condition
-        startFlag = true;
+        if(getPlotterConfigString("Transmit Stat").equals("0"))
+        {
+          serialPort.write("!!!");                       //  If not, sends !!! to serial 
+          value = 1 + "";                                //  and sets the config condition
+          startFlag = true;
+          
+                                                 // - Open new .CSV file
+          dataFolder = "Datalog/";               // - set top level save folder
+          String fileName = new SimpleDateFormat("yyyy-MM-dd'_T['HH''mm''ss'].csv'").format(new Date());
+          output = createWriter(dataFolder + fileName);
+          logFlag = true;
+        }
+        else
+        {
+          serialPort.write("~~~");                       //  If so, sends ~~~ to serial
+          value = 0 + "";                                //  and resets the config condition
+          startFlag = false;
+          
+                                                 // - Close current .CSV file
+          output.flush();                                    //  Flushes the output variable
+          output.close();                                    //  Closes the output
+          logFlag = false;
+        }
+        plotterConfigJSON.setString("Transmit Stat", value);
       }
-      else
-      {
-        serialPort.write("~~~");                       //  If so, sends ~~~ to serial
-        value = 0 + "";                                //  and resets the config condition
-        startFlag = false;
-      }
-      plotterConfigJSON.setString("Transmit Stat", value);
     }
                               //  If triggered by the "Plot Pause" button
     else if (theEvent.isAssignableFrom(Button.class) && parameter == "Plot Pause")
@@ -1033,6 +1198,13 @@ void controlEvent(ControlEvent theEvent) {
       downloadFlag = true;
       println("Download Routine:");
       terminal[0].append("Download Routine:\n");
+      if(logFlag)
+      {
+        println("Closing CSV File");
+        terminal[0].append("Closing CSV File\n");
+        output.flush();                                    //  Flushes the output variable
+        output.close();                                    //  Closes the output
+      }
       
     }
                               //  If triggered by the "Save & Quit" button
@@ -1040,41 +1212,47 @@ void controlEvent(ControlEvent theEvent) {
     {
       serialPort.write("~~~");                           //  Stop transmission before closing
       println("Save & Quit Triggered:");
-      println("Closing CSV File");
-      output.flush();                                    //  Flushes the output variable
-      output.close();                                    //  Closes the output
+      if(logFlag)
+      {
+        println("Closing CSV File");
+        output.flush();                                    //  Flushes the output variable
+        output.close();                                    //  Closes the output
+      }
       exit();                                            //  Closes the program
     }
     
     else if (theEvent.isAssignableFrom(Button.class) && parameter == "Reset Timer")
     {
-      println("Reset Timer Triggered:");
-      println("Closing CSV File");
-      terminal[0].append("Reset Timer Triggered:\n");
-      terminal[0].append("Closing CSV File\n");
-      
-      output.flush();                                    //  Flushes the output variable
-      output.close();                                    //  Closes the output
-      println("Creating new CSV log File");
-      terminal[0].append("Creating new CSV log File\n");
-      String downloadName = new SimpleDateFormat("yyyy-MM-dd'_T['HH''mm''ss'].csv'").format(new Date());
-      output = createWriter(dataFolder + downloadName);
-      
-      
-      String fileName = new SimpleDateFormat("yyyy-MM-dd'_T['HH''mm''ss'].csv'").format(new Date());
-      output = createWriter(dataFolder + fileName);
-      
-      int transStat = int(getPlotterConfigString("Transmit Stat"));
-      serialPort.write("---");
-      
-      for(int i=0; i<lineGraphDataList.length; i++)
-        lineGraphDataList[i].clear();                    //  Clears each data set
-
-      timeIndexMin = 0;                                //  Resets index min and max to 0
-      timeIndexMax = 0;  
-      resetFlag = true;      //  Sets the reset flag to true, which will disable any attempts
-                             //  to plot data until the reset is recognised in the values
-                             //  being read from the serial port.
+      if(!downloadFlag)
+      {
+        if(startFlag)
+        {
+          println("Reset Timer Triggered:");
+          println("Closing CSV File");
+          terminal[0].append("Reset Timer Triggered:\n");
+          terminal[0].append("Closing CSV File\n");
+        
+          output.flush();                                    //  Flushes the output variable
+          output.close();                                    //  Closes the output
+          println("Creating new CSV log File");
+          terminal[0].append("Creating new CSV log File\n");
+          
+          String fileName = new SimpleDateFormat("yyyy-MM-dd'_T['HH''mm''ss'].csv'").format(new Date());
+          output = createWriter(dataFolder + fileName);
+        }
+        
+        int transStat = int(getPlotterConfigString("Transmit Stat"));
+        serialPort.write("---");
+        
+        for(int i=0; i<lineGraphDataList.length; i++)
+          lineGraphDataList[i].clear();                    //  Clears each data set
+  
+        timeIndexMin = 0;                                //  Resets index min and max to 0
+        timeIndexMax = 0;  
+        resetFlag = true;      //  Sets the reset flag to true, which will disable any attempts
+                               //  to plot data until the reset is recognised in the values
+                               //  being read from the serial port.
+      }
     }
 
     saveJSONObject(plotterConfigJSON, topSketchPath+"/datalog_config.json");
