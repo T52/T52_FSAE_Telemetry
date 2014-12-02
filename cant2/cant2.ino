@@ -33,14 +33,14 @@
 
 //#include <stdint.h>
 #include <stdint.h>
-#include <inttypes.h>
-#include <stdbool.h>
+//#include <inttypes.h>
+//#include <stdbool.h>
 
 #include "PLL.h"
 #include "Timer3.h"
 #include "can0.h"
 #include "inc/tm4c123gh6pm.h"
-#include "inc/hw_types.h"
+//#include "inc/hw_types.h"
 
 
 
@@ -84,7 +84,7 @@ int main(void){ volatile uint32_t delay;
   GPIO_PORTF_AMSEL_R = 0;          // disable analog functionality on PF
   CAN0_Open();
   Timer3_Init(&UserTask, 1600000); // initialize timer3 (10 Hz)
-  EnableInterrupts();
+  interrupts(); //"EnableInterrupts()"??
 
   while(1){
     if(CAN0_GetMailNonBlock(RcvData)){

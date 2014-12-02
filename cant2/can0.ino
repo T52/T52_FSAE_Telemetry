@@ -62,14 +62,14 @@ void CAN0_Handler(void){ uint8_t data[4];
   uint32_t ulIntStatus, ulIDStatus;
   int i;
   tCANMsgObject xTempMsgObject;
-  xTempMsgObject.pucMsgData = data;
+  xTempMsgObject.pui8MsgData = data;
   ulIntStatus = CANIntStatus(CAN0_BASE, CAN_INT_STS_CAUSE); // cause?
   if(ulIntStatus & CAN_INT_INTID_STATUS){  // receive?
     ulIDStatus = CANStatusGet(CAN0_BASE, CAN_STS_NEWDAT);
     for(i = 0; i < 32; i++){    //test every bit of the mask
       if( (0x1 << i) & ulIDStatus){  // if active, get data
         CANMessageGet(CAN0_BASE, (i+1), &xTempMsgObject, true);
-        if(xTempMsgObject.ulMsgID == RCV_ID){
+        if(xTempMsgObject.ui32MsgID == RCV_ID){
           RCVData[0] = data[0];
           RCVData[1] = data[1];
           RCVData[2] = data[2];
@@ -90,10 +90,10 @@ void static CAN0_Setup_Message_Object( uint32_t MessageID, \
                                 uint32_t ObjectID, \
                                 tMsgObjType eMsgType){
   tCANMsgObject xTempObject;
-  xTempObject.ulMsgID = MessageID;          // 11 or 29 bit ID
-  xTempObject.ulMsgLen = MessageLength;
-  xTempObject.pucMsgData = MessageData;
-  xTempObject.ulFlags = MessageFlags;
+  xTempObject.ui32MsgID = MessageID;          // 11 or 29 bit ID
+  xTempObject.ui32MsgLen = MessageLength;
+  xTempObject.pui8MsgData = MessageData;
+  xTempObject.ui32Flags = MessageFlags;
   CANMessageSet(CAN0_BASE, ObjectID, &xTempObject, eMsgType);
 }
 // Initialize CAN port
