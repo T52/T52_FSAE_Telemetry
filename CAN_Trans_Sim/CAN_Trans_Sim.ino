@@ -35,14 +35,14 @@ int i=0;
 void loop()
 {
   //---------------------------Assemble CAN Message------------------------------
-  uint16_t HV_Voltage = random(0, 500);
+  uint16_t HV_Voltage = 1;
   uint8_t HV_Amp = random(0, 200);
   uint8_t inv_Faults = random(0, 15);
   uint8_t throttle_Pos = random(0, 100);
   uint8_t brake_Pos = random(0, 100);
   uint8_t car_Faults = random(0, 15);
   uint8_t LV_Battery_Voltage = random(0, 150);
-  uint16_t energy_Used = random(0, 800);
+  uint16_t energy_Used = 1;
   
   Serial.print("HV Voltage: ");            Serial.println(HV_Voltage);
   Serial.print("HV Amp: ");                Serial.println(HV_Amp);
